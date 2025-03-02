@@ -31,7 +31,7 @@ ENHANCED_DF = None
 ANTHROPIC_CLIENT = None
 
 # Create the Flask app instance
-from flask import Flask, request, render_template, jsonify, url_for
+from flask import Flask, request, render_template, jsonify, url_for, send_from_directory
 app = Flask(__name__, 
             static_folder='static', 
             static_url_path='/static',
@@ -39,10 +39,15 @@ app = Flask(__name__,
 
 # Configure app with minimal settings
 app.config['SECRET_KEY'] = os.urandom(24)
-# Make sure url_for() works correctly by configuring the application
-app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', None)
+# Don't set SERVER_NAME as it can cause routing issues in Cloud Run
+app.config.pop('SERVER_NAME', None)
 app.config['PREFERRED_URL_SCHEME'] = 'https'
 app.config['APPLICATION_ROOT'] = '/'
+
+# Enable debug mode only in development
+debug_mode = os.environ.get('FLASK_ENV') == 'development'
+app.debug = debug_mode
+
 # Set up CORS - Light version
 from flask_cors import CORS
 CORS(app)
@@ -54,8 +59,8 @@ socketio = SocketIO(
     path='/ws/socket.io',
     async_mode='eventlet',
     cors_allowed_origins="*",
-    logger=False,  # Disable logging for production
-    engineio_logger=False,  # Disable engineio logging
+    logger=debug_mode,
+    engineio_logger=debug_mode,
     ping_timeout=60,
     ping_interval=25
 )
@@ -63,6 +68,14 @@ socketio = SocketIO(
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
+
+# Make sure static folder exists
+os.makedirs(os.path.join(os.path.dirname(__file__), 'static'), exist_ok=True)
+
+# Add explicit route for static files as backup for direct access
+@app.route('/static/<path:filename>')
+def custom_static(filename):
+    return send_from_directory(app.static_folder, filename)
 
 def lazy_load_anthropic():
     """Lazy load Anthropic client"""
@@ -188,6 +201,11 @@ def forecasting():
 @app.route('/api/port')
 def get_port():
     return jsonify({"port": request.host.split(':')[1] if ':' in request.host else "8080"})
+
+# Health check endpoint for Cloud Run
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "ok", "timestamp": time.time()})
 
 # API routes with lazy loading
 @app.route('/generate_colors', methods=['POST'])
@@ -575,7 +593,7 @@ def run_app(port):
             port=port,
             log_output=True,
             use_reloader=False,
-            debug=False,  # Disable debug mode for production
+            debug=debug_mode,
             allow_unsafe_werkzeug=True
         )
     except Exception as e:
