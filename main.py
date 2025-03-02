@@ -20,6 +20,12 @@ import socket
 import traceback
 from typing import Dict, List
 import time
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, 
+                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Initialize empty values for lazy loading
 FORECASTER = None
@@ -31,7 +37,7 @@ ENHANCED_DF = None
 ANTHROPIC_CLIENT = None
 
 # Create the Flask app instance
-from flask import Flask, request, render_template, jsonify, url_for, send_from_directory
+from flask import Flask, request, render_template, jsonify, url_for, send_from_directory, abort
 app = Flask(__name__, 
             static_folder='static', 
             static_url_path='/static',
@@ -40,13 +46,13 @@ app = Flask(__name__,
 # Configure app with minimal settings
 app.config['SECRET_KEY'] = os.urandom(24)
 
-# Don't pop SERVER_NAME - this is causing your error
-# Instead, just ensure it's not set if we don't want it
+# Don't set SERVER_NAME as it can cause routing issues in Cloud Run
 if 'SERVER_NAME' in app.config:
     app.config['SERVER_NAME'] = None
 
 app.config['PREFERRED_URL_SCHEME'] = 'https'
 app.config['APPLICATION_ROOT'] = '/'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
 
 # Enable debug mode only in development
 debug_mode = os.environ.get('FLASK_ENV') == 'development'
@@ -81,13 +87,31 @@ socketio = SocketIO(
 from dotenv import load_dotenv
 load_dotenv()
 
-# Make sure static folder exists
-os.makedirs(os.path.join(os.path.dirname(__file__), 'static'), exist_ok=True)
+# Make sure static folder exists and log its path
+static_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+os.makedirs(static_folder_path, exist_ok=True)
+logger.info(f"Static folder path: {static_folder_path}")
 
-# Add explicit route for static files as backup for direct access
+# List static directory contents for debugging
+try:
+    static_files = os.listdir(static_folder_path)
+    logger.info(f"Static folder contents: {static_files}")
+except Exception as e:
+    logger.error(f"Error listing static folder contents: {str(e)}")
+
+# Add explicit route for static files with improved error handling
 @app.route('/static/<path:filename>')
 def custom_static(filename):
-    return send_from_directory(app.static_folder, filename)
+    logger.info(f"Serving static file: {filename}")
+    try:
+        if not os.path.exists(os.path.join(app.static_folder, filename)):
+            logger.warning(f"Static file not found: {filename}")
+            return f"File not found: {filename}", 404
+        
+        return send_from_directory(app.static_folder, filename, conditional=True)
+    except Exception as e:
+        logger.error(f"Error serving static file {filename}: {str(e)}")
+        return f"Error serving file: {str(e)}", 500
 
 def lazy_load_anthropic():
     """Lazy load Anthropic client"""
@@ -97,12 +121,12 @@ def lazy_load_anthropic():
             import anthropic
             api_key = os.getenv('ANTHROPIC_API_KEY')
             if not api_key:
-                print("Warning: Anthropic API key not found")
+                logger.warning("Anthropic API key not found")
                 api_key = "dummy_key_for_initialization"
             ANTHROPIC_CLIENT = anthropic.Anthropic(api_key=api_key)
-            print("Successfully initialized Anthropic client")
+            logger.info("Successfully initialized Anthropic client")
         except Exception as e:
-            print(f"Error initializing Anthropic client: {str(e)}")
+            logger.error(f"Error initializing Anthropic client: {str(e)}")
             ANTHROPIC_CLIENT = None
     return ANTHROPIC_CLIENT
 
@@ -113,9 +137,9 @@ def lazy_load_forecaster():
         try:
             from models.forecasting import RevenueForecast
             FORECASTER = RevenueForecast()
-            print("Successfully initialized forecaster")
+            logger.info("Successfully initialized forecaster")
         except Exception as e:
-            print(f"Error initializing forecaster: {str(e)}")
+            logger.error(f"Error initializing forecaster: {str(e)}")
             FORECASTER = None
     return FORECASTER
 
@@ -126,9 +150,9 @@ def lazy_load_teaching_assistant():
         try:
             from models.teaching_assistant import ProjectManagementTA
             TEACHING_ASSISTANT = ProjectManagementTA()
-            print("Successfully initialized teaching assistant")
+            logger.info("Successfully initialized teaching assistant")
         except Exception as e:
-            print(f"Error initializing teaching assistant: {str(e)}")
+            logger.error(f"Error initializing teaching assistant: {str(e)}")
             traceback.print_exc()
             TEACHING_ASSISTANT = None
     return TEACHING_ASSISTANT
@@ -142,9 +166,9 @@ def lazy_load_agent():
             from models.training_manager import TrainingManager
             AGENT = FrozenLake()
             TRAINING_MANAGER = TrainingManager(socketio)
-            print("Successfully initialized Frozen Lake agent")
+            logger.info("Successfully initialized Frozen Lake agent")
         except Exception as e:
-            print(f"Error initializing agent: {str(e)}")
+            logger.error(f"Error initializing agent: {str(e)}")
             traceback.print_exc()
             AGENT = None
             TRAINING_MANAGER = None
@@ -157,9 +181,9 @@ def lazy_load_prediction_models():
         try:
             from models.predictor import model_info, enhanced_df, load_models
             MODEL_INFO, ENHANCED_DF = load_models()
-            print("Successfully loaded prediction models and data")
+            logger.info("Successfully loaded prediction models and data")
         except Exception as e:
-            print(f"Error loading prediction models: {str(e)}")
+            logger.error(f"Error loading prediction models: {str(e)}")
             traceback.print_exc()
             MODEL_INFO = {}
             ENHANCED_DF = None
@@ -168,6 +192,7 @@ def lazy_load_prediction_models():
 # Basic page routes - these don't need the complex models
 @app.route('/')
 def index():
+    logger.info("Rendering index.html")
     return render_template('index.html')
 
 @app.route('/Liveconnect')
@@ -274,7 +299,7 @@ def generate_colors():
             return jsonify({"error": f"AI service error: {str(api_err)}"}), 502
         
     except Exception as e:
-        print(f"Error in /generate_colors: {e}")
+        logger.error(f"Error in /generate_colors: {e}")
         traceback.print_exc()
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
@@ -348,9 +373,9 @@ def predict():
             return jsonify({"error": "Unable to generate prediction"}), 500
 
     except Exception as e:
-        print("Error in /api/predict:")
-        print(str(e))
-        print(traceback.format_exc())
+        logger.error("Error in /api/predict:")
+        logger.error(str(e))
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/model-info')
@@ -391,7 +416,7 @@ def analyze_post():
         return jsonify(feedback)
             
     except Exception as e:
-        print(f"Error in analyze_post route: {str(e)}")
+        logger.error(f"Error in analyze_post route: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -405,7 +430,7 @@ def get_week_content(week):
         content = teaching_assistant.get_week_content(week)
         return jsonify(content)
     except Exception as e:
-        print(f"Error getting week content: {str(e)}")
+        logger.error(f"Error getting week content: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -435,7 +460,7 @@ def start_training():
         return jsonify({"status": "success"})
         
     except Exception as e:
-        print(f"Error starting training: {str(e)}")
+        logger.error(f"Error starting training: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -473,7 +498,7 @@ def randomize_map():
         })
         
     except Exception as e:
-        print(f"Error in randomize_map: {e}")
+        logger.error(f"Error in randomize_map: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -493,7 +518,7 @@ def get_state():
         })
         
     except Exception as e:
-        print(f"Error in get_state: {e}")
+        logger.error(f"Error in get_state: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -526,7 +551,7 @@ def handle_internal_forecast():
             return jsonify({"error": "Forecasting module not initialized"}), 503
         return forecaster.handle_internal_forecast()
     except Exception as e:
-        print(f"Error in internal forecast: {str(e)}")
+        logger.error(f"Error in internal forecast: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -538,7 +563,7 @@ def handle_upsell_forecast():
             return jsonify({"error": "Forecasting module not initialized"}), 503
         return forecaster.handle_upsell_forecast()
     except Exception as e:
-        print(f"Error in upsell forecast: {str(e)}")
+        logger.error(f"Error in upsell forecast: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -550,7 +575,7 @@ def handle_market_forecast():
             return jsonify({"error": "Forecasting module not initialized"}), 503
         return forecaster.handle_market_forecast()
     except Exception as e:
-        print(f"Error in market forecast: {str(e)}")
+        logger.error(f"Error in market forecast: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -562,18 +587,18 @@ def handle_satisfaction_forecast():
             return jsonify({"error": "Forecasting module not initialized"}), 503
         return forecaster.handle_satisfaction_forecast()
     except Exception as e:
-        print(f"Error in satisfaction forecast: {str(e)}")
+        logger.error(f"Error in satisfaction forecast: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 # Socket.IO event handlers
 @socketio.on('connect')
 def handle_connect():
-    print('Client connected')
+    logger.info('Client connected')
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print('Client disconnected')
+    logger.info('Client disconnected')
     agent, training_manager = lazy_load_agent()
     if training_manager and training_manager.is_training:
         training_manager.stop_training()
@@ -601,7 +626,7 @@ def run_app(port):
         # Set buffer size for frame data
         eventlet.wsgi.MAX_BUFFER_SIZE = 16777216  # 16MB
         
-        print(f"Starting server on port: {port}")
+        logger.info(f"Starting server on port: {port}")
         socketio.run(
             app,
             host='0.0.0.0',
@@ -612,14 +637,14 @@ def run_app(port):
             allow_unsafe_werkzeug=True
         )
     except Exception as e:
-        print(f"Error starting server: {e}")
+        logger.error(f"Error starting server: {e}")
         traceback.print_exc()
 
 if __name__ == '__main__':
     try:
         port = int(os.environ.get("PORT", 8080))
-        print(f"Using port: {port}")
+        logger.info(f"Using port: {port}")
         run_app(port)
     except Exception as e:
-        print(f"Error starting server: {e}")
+        logger.error(f"Error starting server: {e}")
         traceback.print_exc()

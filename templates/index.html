@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Try url_for first, fallback to direct path -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" onerror="this.onerror=null;this.href='/static/styles.css';">
 </head>
 <body>
     <div class="profile-info">
-        <img src="{{ url_for('static', filename='Headshot.PNG') }}" alt="Eric Nielson">
+        <!-- Use fallback pattern for images too -->
+        <img src="{{ url_for('static', filename='Headshot.PNG') }}" alt="Eric Nielson" onerror="this.onerror=null;this.src='/static/Headshot.PNG';">
         <h1>Eric Nielson, EdD, MBA</h1>
         <p>Senior Product Manager | Captain</p>
     </div>
