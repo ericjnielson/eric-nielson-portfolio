@@ -50,7 +50,15 @@ app.debug = debug_mode
 
 # Set up CORS - Light version
 from flask_cors import CORS
-CORS(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "allow_headers": "*",
+        "expose_headers": "*",
+        "methods": ["GET", "POST", "OPTIONS"],
+        "supports_credentials": True
+    }
+})
 
 # Initialize Socket.IO with optimized settings
 from flask_socketio import SocketIO, emit
