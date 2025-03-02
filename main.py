@@ -7,10 +7,6 @@ Main Flask application file for portfolio website with various features includin
 - Revenue forecasting
 """
 
-# *** IMPORTANT: Monkey patch eventlet before all other imports ***
-import eventlet
-eventlet.monkey_patch()
-
 # Standard library imports - only import what's absolutely necessary
 import os
 import re
@@ -46,6 +42,14 @@ app = Flask(__name__,
 # Configure app with minimal settings
 app.config['SECRET_KEY'] = os.urandom(24)
 
+# Enable secure headers
+@app.after_request
+def add_header(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    return response
+
 # Don't set SERVER_NAME as it can cause routing issues in Cloud Run
 if 'SERVER_NAME' in app.config:
     app.config['SERVER_NAME'] = None
@@ -71,17 +75,21 @@ CORS(app, resources={
 })
 
 # Initialize Socket.IO with optimized settings
-from flask_socketio import SocketIO, emit
-socketio = SocketIO(
-    app,
-    path='/ws/socket.io',
-    async_mode='eventlet',
-    cors_allowed_origins="*",
-    logger=debug_mode,
-    engineio_logger=debug_mode,
-    ping_timeout=60,
-    ping_interval=25
-)
+try:
+    from flask_socketio import SocketIO, emit
+    socketio = SocketIO(
+        app,
+        path='/ws/socket.io',
+        async_mode='threading',  # Changed from eventlet to threading
+        cors_allowed_origins="*",
+        logger=debug_mode,
+        engineio_logger=debug_mode,
+        ping_timeout=60,
+        ping_interval=25
+    )
+except ImportError:
+    logger.warning("SocketIO not available. Running without WebSocket support.")
+    socketio = None
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -108,7 +116,7 @@ def custom_static(filename):
             logger.warning(f"Static file not found: {filename}")
             return f"File not found: {filename}", 404
         
-        return send_from_directory(app.static_folder, filename, conditional=True)
+        return send_from_directory(app.static_folder, filename)
     except Exception as e:
         logger.error(f"Error serving static file {filename}: {str(e)}")
         return f"Error serving file: {str(e)}", 500
@@ -239,7 +247,6 @@ def forecasting():
 def get_port():
     return jsonify({"port": request.host.split(':')[1] if ':' in request.host else "8080"})
 
-# Health check endpoint for Cloud Run
 @app.route('/health')
 def health_check():
     return jsonify({"status": "ok", "timestamp": time.time()})
@@ -641,10 +648,11 @@ def run_app(port):
         traceback.print_exc()
 
 if __name__ == '__main__':
-    try:
-        port = int(os.environ.get("PORT", 8080))
-        logger.info(f"Using port: {port}")
-        run_app(port)
-    except Exception as e:
-        logger.error(f"Error starting server: {e}")
-        traceback.print_exc()
+    port = int(os.environ.get("PORT", 8080))
+    logger.info(f"Starting app on port {port}")
+    
+    # If we have socket.io
+    if socketio:
+        socketio.run(app, host='0.0.0.0', port=port)
+    else:
+        app.run(host='0.0.0.0', port=port)
