@@ -13,6 +13,8 @@ flask
 flask-cors
 flask-socketio
 gymnasium
+gymnasium[toy-text]  
+pygame  
 opencv-python
 numpy
 scipy
