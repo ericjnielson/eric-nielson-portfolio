@@ -591,6 +591,8 @@ def is_port_in_use(port):
 
 def run_app(port):
     try:
+        eventlet.monkey_patch()
+        
         # Set buffer size for frame data
         eventlet.wsgi.MAX_BUFFER_SIZE = 16777216  # 16MB
         
@@ -601,7 +603,7 @@ def run_app(port):
             port=port,
             log_output=True,
             use_reloader=False,
-            debug=debug_mode,
+            debug=True,
             allow_unsafe_werkzeug=True
         )
     except Exception as e:
