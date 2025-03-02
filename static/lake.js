@@ -15,7 +15,7 @@ let socketConnected = false;
 
 // DOM Elements
 const startButton = document.getElementById('startTraining');
-const stopButton = document.getElementById('stopButton');
+const stopButton = document.getElementById('stopTraining'); // Fixed ID to match HTML
 const saveButton = document.getElementById('saveModel');
 const loadButton = document.getElementById('loadModel');
 const randomizeButton = document.getElementById('randomizeMap');
@@ -35,6 +35,8 @@ const successRate = document.getElementById('successRate');
 
 // Training state
 let isTraining = false;
+let retryCount = 0;
+const MAX_RETRIES = 5;
 
 // Update slider value displays
 function updateSliderDisplay(slider, display) {
@@ -60,6 +62,7 @@ socket.on('connect', () => {
     modelStatus.textContent = 'Connected';
     modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
     socketConnected = true;
+    retryCount = 0;
     
     // Request initial state update when connected
     updateCurrentState();
@@ -71,8 +74,10 @@ socket.on('connect_error', (error) => {
     modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
     socketConnected = false;
     
-    // Alert the user about connection issues
-    showNotification('Connection error: Unable to establish WebSocket connection. Trying to reconnect...', true);
+    // Alert the user about connection issues if retries exhausted
+    if (retryCount >= MAX_RETRIES) {
+        showNotification('Connection error: Unable to establish WebSocket connection. Please check your network and reload the page.', true);
+    }
 });
 
 socket.on('disconnect', (reason) => {
@@ -87,12 +92,15 @@ socket.on('disconnect', (reason) => {
     }
     
     // Try to reconnect manually if socket.io doesn't
-    setTimeout(() => {
-        if (!socketConnected) {
-            console.log('Attempting manual reconnection...');
-            socket.connect();
-        }
-    }, 3000);
+    if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        setTimeout(() => {
+            if (!socketConnected) {
+                console.log(`Attempting manual reconnection (attempt ${retryCount})...`);
+                socket.connect();
+            }
+        }, 2000 * retryCount); // Exponential backoff
+    }
 });
 
 socket.on('training_update', (data) => {
@@ -130,32 +138,67 @@ async function updateStateViaHTTP() {
     }
 }
 
-// Set up periodic state updates (every 5 seconds) as a fallback
-setInterval(updateStateViaHTTP, 5000);
+// Set up periodic state updates (every 10 seconds) as a fallback
+const stateUpdateInterval = setInterval(updateStateViaHTTP, 10000);
+
+// Add authorization headers to all fetch requests
+function fetchWithAuth(url, options = {}) {
+    // Get the current URL to extract authentication parameters
+    const currentUrl = window.location.href;
+    const urlObj = new URL(currentUrl);
+    
+    // Check for any auth tokens in the URL
+    const token = urlObj.searchParams.get('token') || localStorage.getItem('authToken');
+    
+    // Set up default headers
+    const headers = {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...options.headers
+    };
+    
+    // Add token if available
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    // Add CSRF protection if needed
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+    }
+    
+    // Merge with original options
+    const fetchOptions = {
+        ...options,
+        headers,
+        credentials: 'include', // Include cookies
+        mode: 'cors' // Enable CORS
+    };
+    
+    return fetch(url, fetchOptions);
+}
 
 // Training control functions with improved error handling
 async function startTraining() {
     try {
         console.log("Starting training...");
-        const response = await fetch('/start_training', {
+        const response = await fetchWithAuth('/start_training', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify({
                 learning_rate: parseFloat(learningRateSlider.value),
                 discount_factor: parseFloat(discountFactorSlider.value),
                 exploration_rate: parseFloat(explorationRateSlider.value)
-            }),
-            timeout: 10000 // 10 second timeout
+            })
         });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to start training (${response.status}): ${errorText}`);
+        }
 
         const data = await response.json();
         
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to start training');
-        }
-
         isTraining = true;
         startButton.disabled = true;
         stopButton.disabled = false;
@@ -173,17 +216,17 @@ async function startTraining() {
 async function stopTraining() {
     try {
         console.log("Stopping training...");
-        const response = await fetch('/stop_training', {
-            method: 'POST',
-            timeout: 10000 // 10 second timeout
+        const response = await fetchWithAuth('/stop_training', {
+            method: 'POST'
         });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to stop training (${response.status}): ${errorText}`);
+        }
 
         const data = await response.json();
         
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to stop training');
-        }
-
         isTraining = false;
         startButton.disabled = false;
         stopButton.disabled = true;
@@ -213,22 +256,20 @@ async function randomizeMap() {
         console.log("Randomizing map...");
         randomizeButton.disabled = true;
         
-        const response = await fetch('/randomize_map', {
+        const response = await fetchWithAuth('/randomize_map', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify({
                 size: parseInt(mapSizeSelect.value)
             })
         });
 
-        const data = await response.json();
-        
         if (!response.ok) {
-            throw new Error(data.error || 'Failed to randomize map');
+            const errorText = await response.text();
+            throw new Error(`Failed to randomize map (${response.status}): ${errorText}`);
         }
 
+        const data = await response.json();
+        
         // If we got frame data directly, use it
         if (data.frame) {
             updateVisualization(data.frame);
@@ -254,15 +295,16 @@ async function saveModelState() {
     try {
         saveButton.disabled = true;
         
-        const response = await fetch('/save_model', {
+        const response = await fetchWithAuth('/save_model', {
             method: 'POST'
         });
         
-        const data = await response.json();
-        
         if (!response.ok) {
-            throw new Error(data.error || 'Failed to save model');
+            const errorText = await response.text();
+            throw new Error(`Failed to save model (${response.status}): ${errorText}`);
         }
+
+        const data = await response.json();
         
         showNotification('Model saved successfully');
     } catch (error) {
@@ -276,15 +318,16 @@ async function loadModelState() {
     try {
         loadButton.disabled = true;
         
-        const response = await fetch('/load_model', {
+        const response = await fetchWithAuth('/load_model', {
             method: 'POST'
         });
         
-        const data = await response.json();
-        
         if (!response.ok) {
-            throw new Error(data.error || 'Failed to load model');
+            const errorText = await response.text();
+            throw new Error(`Failed to load model (${response.status}): ${errorText}`);
         }
+
+        const data = await response.json();
         
         await updateCurrentState();
         showNotification('Model loaded successfully');
@@ -303,8 +346,9 @@ function updateMetrics(metrics) {
     episodeCount.textContent = metrics.episode_count || 0;
     successRate.textContent = `${(metrics.success_rate || 0).toFixed(1)}%`;
     
-    // Update progress bar (assuming 1000 episodes as goal)
-    const progress = (metrics.episode_count / 1000) * 100;
+    // Update progress bar (assuming max_episodes as goal)
+    const maxEpisodes = metrics.max_episodes || 1000;
+    const progress = (metrics.episode_count / maxEpisodes) * 100;
     trainingProgress.style.width = `${Math.min(progress, 100)}%`;
 }
 
@@ -328,6 +372,18 @@ function updateVisualization(frameData) {
         
         img.onerror = (e) => {
             console.error("Error loading image:", e);
+            
+            // Create fallback visualization
+            const fallbackDiv = document.createElement('div');
+            fallbackDiv.textContent = "Visualization unavailable";
+            fallbackDiv.style.width = "100%";
+            fallbackDiv.style.height = "100%";
+            fallbackDiv.style.display = "flex";
+            fallbackDiv.style.alignItems = "center";
+            fallbackDiv.style.justifyContent = "center";
+            fallbackDiv.style.backgroundColor = "#f0f0f0";
+            fallbackDiv.style.color = "#666";
+            environmentVisualization.appendChild(fallbackDiv);
         };
         
         img.src = `data:image/jpeg;base64,${frameData}`;
@@ -340,9 +396,11 @@ function updateVisualization(frameData) {
 
 async function updateCurrentState() {
     try {
-        const response = await fetch('/get_state');
+        const response = await fetchWithAuth('/get_state');
+        
         if (!response.ok) {
-            throw new Error('Failed to get current state');
+            const errorText = await response.text();
+            throw new Error(`Failed to get current state (${response.status}): ${errorText}`);
         }
         
         const data = await response.json();
@@ -353,25 +411,57 @@ async function updateCurrentState() {
         }
     } catch (error) {
         console.error('Error getting current state:', error);
-        showNotification('Error getting current state: ' + error.message, true);
+        
+        // Only show notification for non-network errors to avoid spamming the user
+        if (!error.message.includes('Failed to fetch') && !error.message.includes('NetworkError')) {
+            showNotification('Error getting current state: ' + error.message, true);
+        }
     }
 }
 
-// Notification function
+// Notification function with improved positioning and fading
 function showNotification(message, isError = false) {
+    // Remove any existing notifications
+    const existingNotifications = document.querySelectorAll('.notification-alert');
+    existingNotifications.forEach(notification => {
+        notification.remove();
+    });
+    
     const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white ${
+    notification.className = `notification-alert fixed top-4 right-4 px-6 py-3 rounded-lg text-white ${
         isError ? 'bg-red-600' : 'bg-green-600'
-    } shadow-lg z-50 transition-opacity duration-300`;
+    } shadow-lg z-50 transition-opacity duration-300 max-w-md`;
     notification.textContent = message;
     
     document.body.appendChild(notification);
     
-    // Fade out and remove after 3 seconds
+    // Fade out and remove after 5 seconds (longer for errors)
+    const displayTime = isError ? 8000 : 3000;
     setTimeout(() => {
         notification.style.opacity = '0';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 300);
+    }, displayTime);
+}
+
+// Initialize backend health check
+async function checkBackendHealth() {
+    try {
+        const response = await fetchWithAuth('/health');
+        if (response.ok) {
+            console.log('Backend is healthy');
+            return true;
+        } else {
+            console.warn('Backend health check failed:', response.status);
+            return false;
+        }
+    } catch (error) {
+        console.error('Health check error:', error);
+        return false;
+    }
 }
 
 // Event Listeners
@@ -380,12 +470,25 @@ stopButton.addEventListener('click', stopTraining);
 saveButton.addEventListener('click', saveModelState);
 loadButton.addEventListener('click', loadModelState);
 randomizeButton.addEventListener('click', randomizeMap);
-mapSizeSelect.addEventListener('change', randomizeMap);
+mapSizeSelect.addEventListener('change', () => {
+    // Don't automatically randomize on change - just update the UI
+    console.log(`Map size changed to ${mapSizeSelect.value}x${mapSizeSelect.value}`);
+});
 
 // Initialize
 stopButton.disabled = true;
 console.log('Initializing RL training interface');
-updateCurrentState();
+
+// Check backend health before initializing
+checkBackendHealth().then(isHealthy => {
+    if (isHealthy) {
+        updateCurrentState();
+    } else {
+        modelStatus.textContent = 'Backend Unavailable';
+        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+        showNotification('Backend service is unavailable. Please try again later.', true);
+    }
+});
 
 // Handle page visibility changes
 document.addEventListener('visibilitychange', () => {
@@ -400,6 +503,10 @@ document.addEventListener('visibilitychange', () => {
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
+    // Clear any intervals
+    clearInterval(stateUpdateInterval);
+    
+    // Stop training if active
     if (isTraining) {
         console.log('Page unloading, stopping training');
         navigator.sendBeacon('/stop_training', '{}');
