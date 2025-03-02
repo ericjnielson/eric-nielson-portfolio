@@ -1,0 +1,10 @@
+{
+  "firebase_hosting": {
+    "deploymentHostingUrl": "https://portfolio.web.app"
+  },
+  "cloud_run_deploy": {
+    "region": "us-east5",
+    "sourceFlag": "--source .",
+    "allowUnauthenticatedInvocationsFlag": "--no-allow-unauthenticated"
+  }
+}

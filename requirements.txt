@@ -1,0 +1,27 @@
+# Dev environment
+pip
+autopep8
+
+# App
+eventlet
+anthropic
+opencv-python
+numpy
+python-dotenv
+openai
+flask
+flask-cors
+flask-socketio
+gymnasium
+opencv-python
+numpy
+scipy
+scikit-learn
+pandas
+joblib
+requests
+pillow
+xgboost
+gql
+aiohttp
+seaborn

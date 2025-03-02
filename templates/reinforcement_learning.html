@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frozen Lake RL Training</title>
+    <link href="/static/styles.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <!-- Main Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">Home</a>
+        </div>
+    </nav>
+
+    <div class="teaching-container">
+        <header class="header">
+            <h1>Reinforcement Learning Game</h1>
+            <p class="tagline">An overview and explanation of how Reinforcement Learning works</p>
+        </header>
+        <!-- New Project Journey Section -->
+        <div class="project-journey">
+            <div class="journey-section">
+                <h2>Project Overview</h2>
+                <p>Reinforcement learning (RL) was a concept that continues to be voiced in the common 'AI narrative'. I wanted to explore the underlying concepts and fundamentals to this style of machine learning. This project had more constraints than the other projects I've completed, especially in regards to the number of choices of environments I could use.</p>
+            </div>
+
+            <div class="journey-section">
+                <h2>Approach</h2>
+                <p>RL relies on an environment for the agent (the gnome, in this case) to learn from. The underlying concept is that for each action the agent takes, a reward (either positive or negative) is provided. These environments are complex to build - and frankly outside of the scope of this project. Thus, I utilized a common environment that many courses teach from, but I added in the extra map randomization and optimal path visuals to better educate on what is actually happening in this training.</p>
+            </div>
+
+            <div class="journey-section">
+                <h2>Directions</h2>
+                <p>Simply navigate below to find the initial state for the agent. Feel free to keep the map at 8x8 or change to 4x4 or 16x16 (this option takes longer). You can also randomize the map to change the locations of the holes in the lake. Then select 'Start Training' where the agent (the gnome) will be seen moving around the map trying to get to the finish line. You'll even see when it falls into the water. The optimized path will appear once the agent has learned and tested that route. </p>
+            </div>
+
+            <div class="journey-grid">
+                <div class="journey-card">
+                    <h3>Key Learnings</h3>
+                    <ul>
+                        <li>RL has very specific use cases and should be examined for applicability before starting to solution with a product</li>
+                        <li>Many of the concepts of RL extend to my doctoral research on Psychological Safety. The underlying concept is that an agent (person or computer) is motivated by an expected reward (or punishment) which will influence future behavior</li>
+                        <li>This style of ML, when paired with the visualization, felt the most 'real' to me to showcase exactly what is being learned vs my other projects</li>
+                    </ul>
+                </div>
+
+                <div class="journey-card">
+                    <h3>Challenges Overcome</h3>
+                    <ul>
+                        <li>I tried many different environments, including Car Racing and Tennis games but those ultimately had too many constraints when it came to rendering the UI while the model was being trained</li>
+                        <li>I chose to use a policy-free (meaning I did not define the optimal path), which introduced more challenges of when to start or stop the model</li>
+                    </ul>
+                </div>
+
+                <div class="journey-card">
+                    <h3>Future Applications</h3>
+                    <ul>
+                        <li>RL seems to fit best in the gaming space or robotics where environments are clearly defined as discrete or continuous</li>
+                        <li>There could be applicability in other spaces, such as education, but there needs to be a clear expected outcome, such as on tests, to identify learning gaps</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Main Content -->
+    <div class="main-container">
+        <div class="content-wrapper">
+            <div class="flex justify-between items-center mb-4">
+                <h1 class="text-2xl font-bold text-gray-800">Frozen Lake RL Training</h1>
+                <span id="modelStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                    Model Ready
+                </span>
+            </div>
+
+            <!-- Controls Row -->
+            <div class="controls-row">
+                <!-- Environment Controls -->
+                <div class="control-panel">
+                    <h2 class="text-lg font-semibold mb-3">Environment Controls</h2>
+                    <div class="space-y-3">
+                        <button id="randomizeMap" class="control-button bg-blue-500 text-white hover:bg-blue-600">
+                            Randomize Map
+                        </button>
+                        <select id="mapSize" class="w-full p-2 border rounded">
+                            <option value="4">4x4 Grid</option>
+                            <option value="8" selected>8x8 Grid</option>
+                            <option value="12">12x12 Grid</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Training Controls -->
+                <div class="control-panel">
+                    <h2 class="text-lg font-semibold mb-3">Training Controls</h2>
+                    <div class="control-buttons">
+                        <button id="startTraining" class="control-button bg-green-500 text-white hover:bg-green-600">
+                            Start Training
+                        </button>
+                        <button id="stopTraining" class="control-button bg-red-500 text-white hover:bg-red-600" disabled>
+                            Stop Training
+                        </button>
+                        <button id="saveModel" class="control-button bg-gray-100 text-white hover:bg-gray-600">
+                        </button>
+                        <button id="loadModel" class="control-button bg-gray-500 text-white hover:bg-gray-600">
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Training Parameters -->
+                <div class="control-panel">
+                    <h2 class="text-lg font-semibold mb-3">Training Parameters</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Learning Rate</label>
+                            <div class="flex items-center gap-3">
+                                <input type="range" id="learningRate" min="0.1" max="1" step="0.1" value="0.1" class="flex-1">
+                                <span id="learningRateValue" class="text-sm text-gray-600 w-12">0.1</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Discount Factor</label>
+                            <div class="flex items-center gap-3">
+                                <input type="range" id="discountFactor" min="0.8" max="0.999" step="0.001" value="0.99" class="flex-1">
+                                <span id="discountFactorValue" class="text-sm text-gray-600 w-12">0.99</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Exploration Rate</label>
+                            <div class="flex items-center gap-3">
+                                <input type="range" id="explorationRate" min="0.01" max="1" step="0.01" value="0.1" class="flex-1">
+                                <span id="explorationRateValue" class="text-sm text-gray-600 w-12">0.1</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization Row -->
+            <div class="visualization-row">
+                <!-- Environment Visualization -->
+                <div class="visualization-container">
+                    <div id="environmentVisualization" class="w-full h-full">
+                        <!-- Visualization will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Training Progress -->
+                <div class="progress-panel">
+                    <h2 class="text-lg font-semibold mb-3">Training Progress</h2>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <p class="text-sm text-gray-600">Average Reward</p>
+                            <p id="avgReward" class="text-xl font-bold text-blue-600">0.00</p>
+                        </div>
+                        <div class="metric-card">
+                            <p class="text-sm text-gray-600">Episodes</p>
+                            <p id="episodeCount" class="text-xl font-bold text-green-600">0</p>
+                        </div>
+                        <div class="metric-card">
+                            <p class="text-sm text-gray-600">Success Rate</p>
+                            <p id="successRate" class="text-xl font-bold text-purple-600">0%</p>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="trainingProgress" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="/static/lake.js"></script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>College Football Predictions</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">Home</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header class="header">
+            <h1>College Football Score Predictions</h1>
+            <p>Machine learning powered predictions for college football games using historical data, team metrics, and game conditions.</p>
+        </header>
+
+        <!-- New Project Journey Section -->
+        <div class="project-journey">
+            <div class="journey-section">
+                <h2>Project Overview</h2>
+                <p>This project emerged from my passion for college football and curiosity to try and build a machine learning model. I wanted to create a 
+                   prediction engine that could compete with professional handicappers while providing transparent 
+                   insights into how predictions are made. The challenge was to develop a system that could process 
+                   complex historical data and generate accurate predictions for future games, no matter if those teams consistently played each other or not.</p>
+            </div>
+
+            <div class="journey-section">
+                <h2>Approach</h2>
+                <p>The solution combines multiple machine learning models trained on historical game data, team 
+                   statistics, seasonal, yearly, strength-of-schedule, and situational factors. Using Python with scikit-learn and pandas, I developed 
+                   a custom ensemble model that weights various factors differently based on their historical 
+                   predictive power. I found the Gradient Boost Regressor model performed better than the Random Forrest and XGBBoost models. When testing with model predicted scores the model comes quite close to the actual games scores. This was easily my most challenging project to date given the difficulty in predicting reasonable results.</p>
+            </div>
+
+            <div class="journey-section">
+                <h2>Directions</h2>
+                <p>Simply navigate below and select the two conferences from the drop down list. You will then select the teams you wish to choose, which will then predict the scores and provide the spread and model weights.</p>
+            </div>
+
+            <div class="journey-grid">
+                <div class="journey-card">
+                    <h3>Key Learnings</h3>
+                    <ul>
+                        <li>Data quality and cleanliness predicate any quality model</li>
+                        <li>ML models require subject matter experts to review results and help to train those models. Many times the predictions revealed results that did not make sense, such as the away team's venue id being the most important feature</li>
+                    </ul>
+                </div>
+
+                <div class="journey-card">
+                    <h3>Challenges Overcome</h3>
+                    <ul>
+                        <li>Initial models continued to weight away features more heavily</li>
+                        <li>Managing data quality across different seasons and rule changes made predictions more challenging</li>
+                        <li>The lack of player data resulted in less quality predictions, especially for early season matchups</li>
+                    </ul>
+                </div>
+
+                <div class="journey-card">
+                    <h3>Future Applications</h3>
+                    <ul>
+                        <li>Implementing automated model retraining. For example, the outputs of one function can be read by the AI to adjust the code to the next input</li>
+                        <li>Creating similar models to other sports</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    
+        <div class="prediction-container">
+            <div class="prediction-panel">
+                <h2>Game Prediction</h2>
+                <!-- Make sure this form ID exists -->
+                <form id="predictionForm">
+                    <div class="form-group">
+                        <label for="homeConference">Home Conference:</label>
+                        <!-- Make sure these select IDs exist -->
+                        <select id="homeConference" name="homeConference" required>
+                            <option value="">Select Conference</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="homeTeam">Home Team:</label>
+                        <select id="homeTeam" name="homeTeam" required disabled>
+                            <option value="">Select Team</option>
+                        </select>
+                    </div>
+                    
+                    <div class="vs-separator">VS</div>
+                    
+                    <div class="form-group">
+                        <label for="awayConference">Away Conference:</label>
+                        <select id="awayConference" name="awayConference" required>
+                            <option value="">Select Conference</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="awayTeam">Away Team:</label>
+                        <select id="awayTeam" name="awayTeam" required disabled>
+                            <option value="">Select Team</option>
+                        </select>
+                    </div>
+    
+                    <button type="submit" class="predict-button">Get Prediction</button>
+                </form>
+            </div>
+            <div class="results-panel" id="resultsContainer">
+                <h2>Prediction Results</h2>
+                <div class="matchup-display">
+                    <!-- Home Team -->
+                    <div class="team-display home">
+                        <h3 id="homeTeamName">--</h3>
+                        <div class="score" id="homeScore">--</div>
+                        <div class="team-stats">
+                        </div>
+                    </div>
+            
+                    <!-- Away Team -->
+                    <div class="team-display away">
+                        <h3 id="awayTeamName">--</h3>
+                        <div class="score" id="awayScore">--</div>
+                        <div class="team-stats">
+                        </div>
+                    </div>
+                </div>
+            
+                <!-- Prediction Details Row -->
+                <div class="prediction-details">
+                    <div class="game-metrics">
+                        <div class="metric">Favorite: <span id="predictedFavorite">--</span></div>
+                        <div class="metric">Spread: <span id="predictedSpread">--</span></div>
+                        <div class="metric">Over/Under: <span id="predictedTotal">--</span></div>
+                    </div>
+            
+                    <div class="model-weights">
+                        <h4>Model Weights</h4>
+                        <div id="weightsContainer">
+                            <!-- Weights will be added here dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/predictions.js"></script>
+</body>
+</html>

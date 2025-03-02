@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revenue Forecasting Models</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-100">
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">Home</a>
+        </div>
+    </nav>
+
+    <div class="teaching-container">
+        <header class="header">
+            <h1>Product Planning and Expected Return</h1>
+            <p class="tagline">An explanation on the crudeness of calculating expected return on specific feature launches and an attempt to prove it</p>
+        </header>
+
+        <div class="project-journey">
+
+            <div class="journey-section">
+                <h2>If We Build It, Will They Come?</h2>
+                <p>Founders start companies to solve a problem. They usually have deep industry expertise and a vision. But companies that fail to solve that problem—or fail to do it better than the competition—ultimately cease to exist.</p>
+                <p>As companies scale, they confront a fundamental truth: <strong>their available market is finite.</strong> Growth slows, and they start searching for expansion levers, largely in the form of upselling, new market entry, or efficiency improvements to reduce cost. The challenge for Product teams becomes <strong>deciding what to build</strong>, given the competing priorities from customers, executives, other internal teams, and the technical realities and limitations of software development.</p>
+                <p>Now the challenge comes with what to build. Let’s divide the argument between four main categories of product growth activities: Internal Productivity, Upsells, New Market Entry, and Customer Satisfaction.</p>
+            </div>
+            <img src="/static/growth.png" alt="Product Growth">
+
+            <div class="journey-section">
+                <h2>The Four Horsemen</h2>
+                <p>Let’s use an analogy of a sponge to illustrate this concept. Imagine you pick up a sponge and start to squeeze water out of it into a number of cups.</p>
+                <ul>
+                    <li>The <strong>sponge</strong> represents the total addressable market.</li>
+                    <li>The <strong>total water</strong> in the sponge is the available revenue in that market.</li>
+                    <li>The <strong>hand strength</strong> it takes to wring out the water is the internal effort to capture that water.</li>
+                    <li>The <strong>cups</strong> are the company's captured and recurring revenue after costs.</li>
+                    <li>There are <strong>holes</strong> in the bottom of these cups that represent churn.</li>
+                    <li>Multiple hands (competitors) are squeezing the same sponge into their various cups.</li>
+                </ul>
+                <p>Now, let’s break down the primary ways companies attempt to squeeze more water from the sponge:</p>
+    
+                <h3>Upsells (Growth Focus)</h3>
+                <p>Many companies believe they can squeeze more money out of existing customers. Some come to this realization after they believe they have capped the addressable market. Others arrive at this approach believing they can attract other dollars from their customers that may be spent with competitors. However, this assumption can be flawed because:</p>
+                <ul>
+                    <li>Market conditions affect how much "water" is left in the sponge. For example, interest rates may slow growth or changing consumer demands may shift production lines or focus.</li>
+                    <li>Competitor strength influences pricing pressure.</li>
+                    <li>Customer budgets are not unlimited. Some even have zero-based budgeting practices which make this practice even more difficult and long-tailed.</li>
+                </ul>
+                <p>There are absolutely possibilities in this space, especially in B2B or Enterprise deals. However, companies must then recognize when their sponge has - or is about to - run dry and seek out markets <strong>that are also growing.</strong></p>
+    
+                <h3>New Market Entry (Growth Focus)</h3>
+                <p>Expanding into new markets seems straightforward, but it is anything but. Companies must dedicate adequate time to research and survey any new markets the company hopes to enter to identify whether or not <strong>it is a focus of the company</strong> and if <strong>their product will solve those new customers problems</strong>. This approach often requires:</p>
+                <ul>
+                    <li>Identifying <strong>product-market fit</strong>. An ESPN interview case study illustrated this well when the ask was for interviewees to try and price the 'High 5' candy bar that was about to go to market (this was never real, but it was a test used to assess advertising effectiveness in NFL content).</li>
+                    <li>Reconfiguring the product or developing a new one. This could be as simple as copy changes to as complex as an entirely new Platform ecosystem.</li>
+                    <li>Aligning marketing, go-to-market, and sales efforts. This often means either net new or revisioning existing materials and training sessions</li>
+                </ul>
+                <p>However, new markets are not always a silver bullet. <strong>Even the largest markets have a limited amount of sponges and water</strong> - and there are often hands already gripping those sponges. We must also not forget to let the boat sink and allow the current water in our cup to spill out.</p>
+    
+                <h3>Customer Satisfaction (Retention Focus)</h3>
+                <p>Customers stay as long as the product continues to deliver value. However, retention efforts often take a backseat to growth initiatives.</p>
+                <p>Common retention metrics include:</p>
+                <ul>
+                    <li>Customer Satisfaction Score (CSAT)</li>
+                    <li>Customer Effort Score (CES)</li>
+                </ul>
+                <p>Ignoring these initiatives leads to increased churn when competitors offer a better or cheaper alternative.</p>
+    
+                <h3>Internal Productivity (Sustainability Focus)</h3>
+                <p>Neglecting internal productivity results in:</p>
+                <ul>
+                    <li>Accumulating technical debt.</li>
+                    <li>Slower performance and increasing bugs.</li>
+                    <li>A fragile, inefficient development process.</li>
+                </ul>
+                <p>Since these efforts do not have direct revenue impact, they are often overlooked—until an infrastructure failure forces action.</p>
+            </div>
+            <img src="/static/market.png" alt="Market Growth">
+
+            <div class="journey-section">
+                <h2>The Weaponization of 'Prioritization'</h2>
+                <p><strong>Capacity is finite.</strong> Even if a company hires 1,000 engineers tomorrow, onboarding and dependencies prevent immediate acceleration. Additionally, many features and lines of effort can not be completed by multiple engineers at one time. You can hire 1,000 people to change a lightbulb, but it will not speed up the process.</p>
+                <blockquote class="quote">
+                    "If everything is a priority, nothing is."
+                </blockquote>
+                <p>Prioritization should be rational. We should spend our time building the products that our customers need to solve their problems and to maintain them in a way that continues to improve their workflow. But often, prioritization becomes political:</p>
+                <ul>
+                    <li>Sales teams may often demand features for specific customers. These may result in company specific features that makes code maintenance on a J-curve trajectory of complexity and should be avoided. This practice is also short-sighted as we will have to dedicate future engineering capacity towards this maintenance that could have been dedicated to planned features.</li>
+                    <li>Executives push growth initiatives. On the surface, this is not detrimental. These executives often have years of experience and usually have a strong pulse on the market. The problem with this lies when there is either conflicts between executive asks and product metrics or when these unplanned asks grow to a larger and larger percentage of the pie over time.</li>
+                    <li>Engineering teams advocate for technical debt reduction. This is usually done when they are trying to keep their head above water as they spend the majority of their time fixing bugs or responding to 'P1/Sev1' issues.</li>
+                    <li>Product teams may not have done proper research and are acting on gut alone. This may be due to a number of factors, but usually that Product does not have enough time to talk to customers or conduct research - or they simply lack the motivation to do so. The backlog isn't going to clean itself and that last minute PowerPoint deck that will never be used again needs someone to create it, you know?</li>
+                </ul>
+                <img src="/static/execution.png" alt="Product Resourcing">
+
+                <p>Without a clear framework and focus, prioritization turns into a defensive maneuver rather than a strategic decision.</p>
+            </div>
+            <img src="/static/engineering.png" alt="Product Engineering">
+
+            <div class="journey-section">
+                <h2>Hocus Focus</h2>
+                <p>Great companies say "no" more often than they say "yes." They understand the user and what their immediate needs are. The key to prioritization is <strong>focus</strong>.</p>
+                <p>The military has a concept called the <strong>"Commander’s Intent"</strong>. It is a guiding directive that all new Commander's create to ensure their teams make aligned decisions without having to get their approval on every minute detail. Companies need the same.</p>
+                <p>Instead of attempting to build everything, great product teams:</p>
+                <ul>
+                    <li>Identify the top features that <strong>truly move the needle</strong>. This is a bit of an overused phrased - and often weaponized as often as prioritization is - but it speaks to the root of the capacity dilemna. Spend the most time on the work that will improve our customer's lives or work the most. Everything after that is gravy.</li>
+                    <li>Align across departments on <strong>what matters most</strong>. This will require collaboration and hard conversations. The term 'product-led growth' would cease to exist from our terminology if this happened in practice.</li>
+                    <li>Execute relentlessly. Commit to the priorities. Realize what's important. Fail forward.</li>
+                </ul>
+                <img src="/static/focus.png" alt="Product Execution">
+                <blockquote class="quote">
+                    "Plans are worthless, but planning is everything"
+                </blockquote>
+                <p>Thus, a truly optimized capacity plan may look something like the following where different team's time is dedicated to different priorities, features, CI/CD and research:</p>
+            </div>
+            <img src="/static/output.png" alt="Product Output">
+
+            <div class="journey-section">
+                <h2>Time to Prove It</h2>
+                <p>Now that we’ve covered the thought process, let’s quantify impact.</p>
+                <p>Below is a forecasting tool that will estimate the best, expected and worst case scenarios for a given feature or product when directed against one of the Four Horsemen discussed above.</p>
+                <p>Your task is to try and utilize this tool. To start, take a single feature or product you are expecting to launch but only use single numbers, not ranges. Take note of the expected outcome.</p>
+                <h4>Step 1: Define a Single Feature or Product</h4>
+                <p>Enter expected values (e.g., adoption, revenue potential, retention impact).</p>
+                <p>Calculate the forecast for any of the Four Horsemen you are interested in.</p>
+
+                <h4>Step 2: Scenario Based Modeling</h4>
+                <p>Once you're done, let's introduce the concept of variability because the future is under no obligation to comply with your plan or forecast.</p>
+                <p>Instead of fixed numbers, use ranges where applicable—e.g., expected upsell rates might be 2-5%.</p>
+                
+                <h4>Step 3: Evaluate Trade-Offs</h4>
+                <p>Compare features based on:</p>
+                <ul>
+                    <li>Engineering effort</li>
+                    <li>Strategic fit</li>
+                    <li>Impact on engineering sustainability</li>
+                </ul>
+                <p>Now take note of the total range of returns for each calculation you complete. This is what should be utilized when planning - especially if you are trying to calculate for a single or packaged set of features. Now you can try and add up all the features you are 'focusing' on and have better signal as to what are the possible outcomes.</p>
+                <p>By adopting probabilistic thinking, teams make informed trade-offs instead of relying on gut instinct.</p>
+            </div>
+    
+        </div>
+
+        <div class="model-tabs">
+            <button class="tab-btn active" data-model="internal">Internal Cost Savings</button>
+            <button class="tab-btn" data-model="upsell">Customer Upsell</button>
+            <button class="tab-btn" data-model="market">New Market Entry</button>
+            <button class="tab-btn" data-model="satisfaction">Customer Satisfaction</button>
+        </div>
+
+        <!-- Internal Cost Savings Form -->
+        <div class="model-panel active" id="internal-panel" data-model="internal"> 
+            <h2>Internal Cost Savings Calculator</h2>
+            <div class="input-form">
+                <!-- Annual Hours Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Annual Hours Spent</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="annualHours">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="annualHours">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="annualHours-single">
+                        <input type="number" id="annualHours" placeholder="e.g., 25000">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="annualHours-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="annualHoursMin" placeholder="e.g., 20000">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="annualHoursMax" placeholder="e.g., 30000">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Total hours spent on current process</span>
+                </div>
+
+                <!-- Hourly Rate Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Employee Cost per Hour ($)</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="hourlyRate">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="hourlyRate">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="hourlyRate-single">
+                        <input type="number" id="hourlyRate" placeholder="e.g., 70">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="hourlyRate-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="hourlyRateMin" placeholder="e.g., 65">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="hourlyRateMax" placeholder="e.g., 75">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Including benefits and overhead</span>
+                </div>
+
+                <!-- Current Velocity Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Current Engineering Velocity</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="currentVelocity">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="currentVelocity">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="currentVelocity-single">
+                        <input type="number" id="currentVelocity" placeholder="e.g., 10">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="currentVelocity-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="currentVelocityMin" placeholder="e.g., 8">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="currentVelocityMax" placeholder="e.g., 12">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Features released per quarter</span>
+                </div>
+                <!-- Tool Cost Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Tool/Process Cost ($)</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="toolCost">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="toolCost">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="toolCost-single">
+                        <input type="number" id="toolCost" placeholder="e.g., 50000">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="toolCost-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="toolCostMin" placeholder="e.g., 45000">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="toolCostMax" placeholder="e.g., 55000">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Including implementation costs</span>
+                </div>
+
+                <!-- Velocity Increase Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Expected Velocity Increase (%)</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="velocityIncrease">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="velocityIncrease">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="velocityIncrease-single">
+                        <input type="number" id="velocityIncrease" placeholder="e.g., 20">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="velocityIncrease-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="velocityIncreaseMin" placeholder="e.g., 15">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="velocityIncreaseMax" placeholder="e.g., 25">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Projected improvement percentage</span>
+                </div>
+                <!-- Confidence Level Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Confidence Level</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="confidenceLevel">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="confidenceLevel">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="confidenceLevel-single">
+                        <input type="number" id="confidenceLevel" placeholder="e.g., 0 - 10">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="confidenceLevel-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="confidenceLevelMin" placeholder="e.g., 0">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="confidenceLevelMax" placeholder="e.g., 10">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Confidence Level</span>
+                </div>
+            </div>
+        </div>
+ 
+<!-- Customer Upsell Form -->
+        <div class="model-panel" id="upsell-panel" data-model="upsell">
+            <h2>Customer Upsell Analysis</h2>
+            <div class="input-form">
+        <!-- Current Customers Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Current Customers</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="currentCustomers">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="currentCustomers">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="currentCustomers-single">
+                        <input type="number" id="currentCustomers" placeholder="e.g., 25000">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="currentCustomers-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="currentCustomersMin" placeholder="e.g., 20000">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="currentCustomersMax" placeholder="e.g., 30000">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Total Customers</span>
+                </div>
+                <!-- Expected Upgrade Rate Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Expected Upgrade Rate (%)</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="upgradeRate">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="upgradeRate">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="upgradeRate-single">
+                        <input type="number" id="upgradeRate" placeholder="e.g., 25">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="upgradeRate-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="upgradeRateMin" placeholder="e.g., 20">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="upgradeRateMax" placeholder="e.g., 30">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Expected Upgrade Rate (%)</span>
+                </div>
+
+                <!-- Incremental Revenue Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Incremental Revenue per Upgrade ($)</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="incrementalRevenue">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="incrementalRevenue">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="incrementalRevenue-single">
+                        <input type="number" id="incrementalRevenue" placeholder="e.g., 500">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="incrementalRevenue-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="incrementalRevenueMin" placeholder="e.g., 400">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="incrementalRevenueMax" placeholder="e.g., 600">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Additional revenue per customer upgrade</span>
+                </div>
+
+                <!-- Implementation Cost Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Implementation Cost ($)</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="implementationCost">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="implementationCost">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="implementationCost-single">
+                        <input type="number" id="implementationCost" placeholder="e.g., 50000">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="implementationCost-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="implementationCostMin" placeholder="e.g., 40000">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="implementationCostMax" placeholder="e.g., 60000">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Total implementation and upgrade costs</span>
+                </div>
+                <!-- Confidence Level Input -->
+                <div class="input-group">
+                    <div class="input-header">
+                        <label>Confidence Level</label>
+                        <div class="field-toggle">
+                            <button class="field-toggle-btn active" data-mode="single" data-field="confidenceLevel">Single</button>
+                            <button class="field-toggle-btn" data-mode="range" data-field="confidenceLevel">Range</button>
+                        </div>
+                    </div>
+                    
+                    <div class="single-value-container" id="confidenceLevel-single">
+                        <input type="number" id="confidenceLevel" placeholder="e.g., 0 - 10">
+                    </div>
+                    
+                    <div class="range-value-container hidden" id="confidenceLevel-range">
+                        <div class="range-inputs">
+                            <div class="range-input">
+                                <label class="sublabel">Minimum</label>
+                                <input type="number" id="confidenceLevelMin" placeholder="e.g., 0">
+                            </div>
+                            <div class="range-input">
+                                <label class="sublabel">Maximum</label>
+                                <input type="number" id="confidenceLevelMax" placeholder="e.g., 10">
+                            </div>
+                        </div>
+                    </div>
+                    <span class="helper-text">Confidence Level</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Market Entry Form -->
+        <div class="model-panel" id="market-panel" data-model="market">
+            <h2>New Market Entry Analysis</h2>
+                <div class="input-form">
+                    <!-- Total Potential Customers Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Total Potential Customers</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="totalCustomers">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="totalCustomers">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="totalCustomers-single">
+                            <input type="number" id="totalCustomers" placeholder="e.g., 100000">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="totalCustomers-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="totalCustomersMin" placeholder="e.g., 80000">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="totalCustomersMax" placeholder="e.g., 120000">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Total addressable market size</span>
+                    </div>
+
+                    <!-- Market Penetration Rate Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Market Penetration Rate (%)</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="penetrationRate">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="penetrationRate">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="penetrationRate-single">
+                            <input type="number" id="penetrationRate" placeholder="e.g., 5">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="penetrationRate-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="penetrationRateMin" placeholder="e.g., 3">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="penetrationRateMax" placeholder="e.g., 7">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Expected market share</span>
+                    </div>
+
+                    <!-- Average Contract Value Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Average Contract Value ($)</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="contractValue">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="contractValue">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="contractValue-single">
+                            <input type="number" id="contractValue" placeholder="e.g., 5000">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="contractValue-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="contractValueMin" placeholder="e.g., 4000">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="contractValueMax" placeholder="e.g., 6000">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Per customer annual value</span>
+                    </div>
+                   <!-- Initial Market Entry Costs Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Initial Market Entry Costs ($)</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="initialCosts">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="initialCosts">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="initialCosts-single">
+                            <input type="number" id="initialCosts" placeholder="e.g., 500000">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="initialCosts-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="initialCostsMin" placeholder="e.g., 400000">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="initialCostsMax" placeholder="e.g., 600000">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Total implementation and entry costs</span>
+                    </div>
+
+                    <!-- Competitor Market Share Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Competitor Market Share (%)</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="competitorShare">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="competitorShare">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="competitorShare-single">
+                            <input type="number" id="competitorShare" placeholder="e.g., 30">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="competitorShare-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="competitorShareMin" placeholder="e.g., 25">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="competitorShareMax" placeholder="e.g., 35">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Existing competition percentage</span>
+                    </div>
+
+                    <!-- Market Readiness Score Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Market Readiness Score (1-10)</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="marketReadiness">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="marketReadiness">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="marketReadiness-single">
+                            <input type="number" id="marketReadiness" min="1" max="10" placeholder="e.g., 7">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="marketReadiness-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="marketReadinessMin" min="1" max="10" placeholder="e.g., 6">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="marketReadinessMax" min="1" max="10" placeholder="e.g., 8">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Market maturity assessment</span>
+                    </div>
+                    <!-- Confidence Level Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Confidence Level</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="confidenceLevel">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="confidenceLevel">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="confidenceLevel-single">
+                            <input type="number" id="confidenceLevel" placeholder="e.g., 0 - 10">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="confidenceLevel-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="confidenceLevelMin" placeholder="e.g., 0">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="confidenceLevelMax" placeholder="e.g., 10">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Confidence Level</span>
+                    </div>
+                </div>
+        </div>
+        <!-- Customer Satisfaction Form -->
+        <div class="model-panel" id="satisfaction-panel" data-model="satisfaction">
+            <h2>Customer Satisfaction Impact</h2>
+                <div class="input-form">
+                    <!-- Current NPS Score Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Current CSAT/NPS Score</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="currentNPS">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="currentNPS">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="currentNPS-single">
+                            <input type="number" id="currentNPS" placeholder="e.g., 50">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="currentNPS-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="currentNPSMin" placeholder="e.g., 45">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="currentNPSMax" placeholder="e.g., 55">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Current CSAT/NPS Score</span>
+                    </div>
+
+                    <!-- Target NPS Score Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Target CSAT/NPS Score</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="targetNPS">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="targetNPS">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="targetNPS-single">
+                            <input type="number" id="targetNPS" placeholder="e.g., 60">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="targetNPS-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="targetNPSMin" placeholder="e.g., 55">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="targetNPSMax" placeholder="e.g., 65">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Desired CSAT/NPS Score</span>
+                    </div>
+
+                    <!-- Current Churn Rate Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Current Churn Rate (%)</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="currentChurn">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="currentChurn">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="currentChurn-single">
+                            <input type="number" id="currentChurn" placeholder="e.g., 10">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="currentChurn-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="currentChurnMin" placeholder="e.g., 8">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="currentChurnMax" placeholder="e.g., 12">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Current customer churn percentage</span>
+                    </div>
+
+                   <!-- Initiative Cost Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Initiative Cost ($)</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="initiativeCost">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="initiativeCost">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="initiativeCost-single">
+                            <input type="number" id="initiativeCost" placeholder="e.g., 100000">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="initiativeCost-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="initiativeCostMin" placeholder="e.g., 80000">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="initiativeCostMax" placeholder="e.g., 120000">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Total cost of improvement initiatives</span>
+                    </div>
+
+                    <!-- Renewal Rate Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Current Renewal Rate (%)</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="renewalRate">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="renewalRate">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="renewalRate-single">
+                            <input type="number" id="renewalRate" placeholder="e.g., 85">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="renewalRate-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="renewalRateMin" placeholder="e.g., 80">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="renewalRateMax" placeholder="e.g., 90">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Confidence Level Input -->
+                    <div class="input-group">
+                        <div class="input-header">
+                            <label>Confidence Level</label>
+                            <div class="field-toggle">
+                                <button class="field-toggle-btn active" data-mode="single" data-field="confidenceLevel">Single</button>
+                                <button class="field-toggle-btn" data-mode="range" data-field="confidenceLevel">Range</button>
+                            </div>
+                        </div>
+                        
+                        <div class="single-value-container" id="confidenceLevel-single">
+                            <input type="number" id="confidenceLevel" placeholder="e.g., 0 - 10">
+                        </div>
+                        
+                        <div class="range-value-container hidden" id="confidenceLevel-range">
+                            <div class="range-inputs">
+                                <div class="range-input">
+                                    <label class="sublabel">Minimum</label>
+                                    <input type="number" id="confidenceLevelMin" placeholder="e.g., 0">
+                                </div>
+                                <div class="range-input">
+                                    <label class="sublabel">Maximum</label>
+                                    <input type="number" id="confidenceLevelMax" placeholder="e.g., 10">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="helper-text">Confidence Level</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button id="calculateBtn" class="calculate-btn">Calculate Forecast</button>
+        <div class="results-section">
+            <div class="chart-container">
+                <canvas id="forecastChart"></canvas>
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h3>Best Case</h3>
+                    <div class="amount" id="bestCase">$0</div>
+                    <div class="confidence" id="bestConfidence">90% Confidence</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Expected Case</h3>
+                    <div class="amount" id="expectedCase">$0</div>
+                    <div class="confidence" id="expectedConfidence">95% Confidence</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Worst Case</h3>
+                    <div class="amount" id="worstCase">$0</div>
+                    <div class="confidence" id="worstConfidence">90% Confidence</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="calculationExplanation" class="mt-8"></div>
+
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/forecasting.js"></script>
+</body>
+</html>

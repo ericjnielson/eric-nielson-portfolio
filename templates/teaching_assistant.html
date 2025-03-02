@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Management Teaching Assistant</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">Home</a>
+        </div>
+    </nav>
+
+    <div class="teaching-container">
+        <header class="header">
+            <h1>Discussion Review Assistant</h1>
+            <p class="tagline">Generate targeted feedback for student discussion posts</p>
+        </header>
+
+        <!-- New Project Journey Section -->
+        <div class="project-journey">
+            <div class="journey-section">
+                <h2>Project Overview</h2>
+                <p>As an Adjunct Professor in an MBA program, I identified a significant challenge in providing consistent, 
+                   thorough, and timely feedback to student discussion posts. With hundreds of posts to review weekly, 
+                   maintaining quality while managing time became increasingly difficult, especially trying to provide relevant and critical feedback based on the material. This led to the development 
+                   of this AI-powered teaching assistant.</p>
+            </div>
+
+            <div class="journey-section">
+                <h2>Approach</h2>
+                <p>The solution leverages Anthropic's Claude 3.7 model using few-shot inference using previous discussion feedback I had given before in addition to providing the class rubric and syllabus. 
+                   I implemented a Flask backend with structured content analysis algorithms and developed a Python and Javascript 
+                   frontend for intuitive interaction. The system processes posts against weekly learning objectives 
+                   and provides multi-dimensional feedback.</p>
+            </div>
+
+            <div class="journey-section">
+                <h2>Directions</h2>
+                <p>Simply navigate below and input some text into the input location. Click generate feedback and wait until the AI has developed customized responses to that text. To start, feel free to use this discussion for Week 2, Discussion Post 1 (not a real submission): "In this situation, my negotiation strategy would focus on balancing the needs of the project and the constraints of the loading dock. First, I would schedule a meeting with the loading dock supervisor to better understand their concerns. If the issue is resource constraints, I would explore potential compromises, such as allowing the employee to split time between the project and the loading dock or backfilling their position with temporary help. I would also highlight the benefits of having a CAPM-certified employee gain project experience, which could ultimately benefit the loading dock by improving efficiency in the long run. If necessary, I could propose a phased transition where the employee gradually shifts to the project team, giving the loading dock time to adjust. If the supervisor remains reluctant, I would escalate the issue to higher management to determine if there are company-wide priorities that could support the employee’s reassignment. While the loading dock’s concerns are valid, ensuring that qualified employees have opportunities for growth is important for overall company success."</p>
+            </div>
+
+            <div class="journey-grid">
+                <div class="journey-card">
+                    <h3>Key Learnings</h3>
+                    <ul>
+                        <li>Few-shot inference provided student discussions with higher quality and more directed feedback</li>
+                        <li>Few-shot inference was able to create feedback consistent with my own tone the majority of the time</li>
+                        <li>Balancing automation with human oversight maintains educational quality</li>
+                    </ul>
+                </div>
+
+                <div class="journey-card">
+                    <h3>Challenges Overcome</h3>
+                    <ul>
+                        <li>Initial AI responses were too generic and needed better context awareness</li>
+                        <li>Some of the responses given were inaccurate where more examples helped improve those</li>
+                        <li>I had initial troubles returning different outcomes and prompts because each week had two different discussion posts</li>
+                    </ul>
+                </div>
+
+                <div class="journey-card">
+                    <h3>Future Applications</h3>
+                    <ul>
+                        <li>Embedding this same TA into grading their papers to create a holistic view of their understanding</li>
+                        <li>Reviewing student responses over time to identify improvements and areas of improvement</li>
+                        <li>Ability for students to engage with AI that was trained by an expert in that field to question and improve critical thinking</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="feedback-grid">
+            <!-- Input Panel -->
+            <div class="input-panel">
+                <div class="form-group">
+                    <label for="weekSelect">Select Week</label>
+                    <select id="weekSelect">
+                        <option value="1">Week 1 - Project Fundamentals</option>
+                        <option value="2">Week 2 - Scope and WBS</option>
+                        <option value="3">Week 3 - Risk and Quality</option>
+                        <option value="4">Week 4 - Operations Management</option>
+                        <option value="5">Week 5 - Supply Chain Design</option>
+                        <option value="6">Week 6 - Managing Operations</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="discussionSelect">Select Discussion</label>
+                    <select id="discussionSelect">
+                        <option value="1">Discussion 1</option>
+                        <option value="2">Discussion 2</option>
+                    </select>
+                </div>
+
+                <div class="prompt-section">
+                    <h3 id="discussionTitle">Discussion Prompt</h3>
+                    <p id="currentPrompt"></p>
+                    <div class="objectives-list">
+                        <ul id="promptObjectives"></ul>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="postInput">Student Post</label>
+                    <textarea id="postInput" placeholder="Paste student discussion post here..."></textarea>
+                </div>
+
+                <button class="analyze-button">Generate Feedback</button>
+            </div>
+
+            <!-- Feedback Panel -->
+            <div class="feedback-panel">
+                <h2>Generated Feedback</h2>
+                <div class="feedback-content">
+                    <div class="feedback-section">
+                        <h3>Positive Feedback</h3>
+                        <p id="positiveFeedback">Feedback will appear here after analysis...</p>
+                    </div>
+
+                    <div class="feedback-section">
+                        <h3>Areas for Development</h3>
+                        <p id="developmentFeedback">Areas for improvement will appear here...</p>
+                    </div>
+
+                    <div class="feedback-section">
+                        <h3>Connection to Future Topics</h3>
+                        <p id="connectionsFeedback">Topic connections will appear here...</p>
+                    </div>
+
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-value" id="contentScore">-</div>
+                            <div class="metric-label">Content Coverage</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="thinkingScore">-</div>
+                            <div class="metric-label">Critical Thinking</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="applicationScore">-</div>
+                            <div class="metric-label">Practical Application</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/teaching_assistant.js"></script>
+</body>
+</html>
