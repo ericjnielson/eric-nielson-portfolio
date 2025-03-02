@@ -1,12 +1,21 @@
-// Initialize Socket.IO
+// Initialize Socket.IO with more robust error handling and reconnection
 const socket = io({
     path: '/ws/socket.io',
-    transports: ['polling', 'websocket']
+    transports: ['polling', 'websocket'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
+    autoConnect: true
 });
+
+// Connection state tracking
+let socketConnected = false;
 
 // DOM Elements
 const startButton = document.getElementById('startTraining');
-const stopButton = document.getElementById('stopTraining');
+const stopButton = document.getElementById('stopButton');
 const saveButton = document.getElementById('saveModel');
 const loadButton = document.getElementById('loadModel');
 const randomizeButton = document.getElementById('randomizeMap');
@@ -44,12 +53,13 @@ learningRateSlider.addEventListener('input', () => updateSliderDisplay(learningR
 discountFactorSlider.addEventListener('input', () => updateSliderDisplay(discountFactorSlider, discountFactorValue));
 explorationRateSlider.addEventListener('input', () => updateSliderDisplay(explorationRateSlider, explorationRateValue));
 
-// Socket event handlers
+// Socket event handlers with improved error handling
 socket.on('connect', () => {
     console.log('Socket connected successfully');
     console.log('Transport type:', socket.io.engine.transport.name);
     modelStatus.textContent = 'Connected';
     modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+    socketConnected = true;
     
     // Request initial state update when connected
     updateCurrentState();
@@ -59,12 +69,30 @@ socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error);
     modelStatus.textContent = 'Connection Error';
     modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+    socketConnected = false;
+    
+    // Alert the user about connection issues
+    showNotification('Connection error: Unable to establish WebSocket connection. Trying to reconnect...', true);
 });
 
 socket.on('disconnect', (reason) => {
     console.log('Socket disconnected:', reason);
     modelStatus.textContent = 'Disconnected';
     modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
+    socketConnected = false;
+    
+    // If training is in progress, try to stop it through regular HTTP
+    if (isTraining) {
+        stopTraining();
+    }
+    
+    // Try to reconnect manually if socket.io doesn't
+    setTimeout(() => {
+        if (!socketConnected) {
+            console.log('Attempting manual reconnection...');
+            socket.connect();
+        }
+    }, 3000);
 });
 
 socket.on('training_update', (data) => {
@@ -91,7 +119,21 @@ socket.on('training_error', (data) => {
     stopTraining();
 });
 
-// Training control functions
+// Fallback HTTP communication for environments where WebSockets fail
+async function updateStateViaHTTP() {
+    if (!socketConnected) {
+        try {
+            await updateCurrentState();
+        } catch (error) {
+            console.error("Error updating state via HTTP:", error);
+        }
+    }
+}
+
+// Set up periodic state updates (every 5 seconds) as a fallback
+setInterval(updateStateViaHTTP, 5000);
+
+// Training control functions with improved error handling
 async function startTraining() {
     try {
         console.log("Starting training...");
@@ -104,7 +146,8 @@ async function startTraining() {
                 learning_rate: parseFloat(learningRateSlider.value),
                 discount_factor: parseFloat(discountFactorSlider.value),
                 exploration_rate: parseFloat(explorationRateSlider.value)
-            })
+            }),
+            timeout: 10000 // 10 second timeout
         });
 
         const data = await response.json();
@@ -131,7 +174,8 @@ async function stopTraining() {
     try {
         console.log("Stopping training...");
         const response = await fetch('/stop_training', {
-            method: 'POST'
+            method: 'POST',
+            timeout: 10000 // 10 second timeout
         });
 
         const data = await response.json();
