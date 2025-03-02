@@ -119,3 +119,42 @@ Before we get started, keep in mind:
     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
 [error] 
 [error] Error: Failed to get Firebase project portfolio. Please make sure the project exists and your account has permission to access it.
+[debug] [2025-03-02T18:34:19.227Z] ----------------------------------------------------------------------
+[debug] [2025-03-02T18:34:19.230Z] Command:       /nix/store/ixbb20farqh1f4fqbmsn6b1ixn8mc8ij-nodejs-20.18.1/bin/node /nix/store/2id8zx3wi2gh8x4pd02cyri43q3i6ll2-firebase-tools-13.29.3/lib/node_modules/firebase-tools/lib/bin/firebase.js deploy --only hosting
+[debug] [2025-03-02T18:34:19.231Z] CLI Version:   13.29.3
+[debug] [2025-03-02T18:34:19.231Z] Platform:      linux
+[debug] [2025-03-02T18:34:19.231Z] Node Version:  v20.18.1
+[debug] [2025-03-02T18:34:19.231Z] Time:          Sun Mar 02 2025 18:34:19 GMT+0000 (Coordinated Universal Time)
+[debug] [2025-03-02T18:34:19.232Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-03-02T18:34:19.740Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-03-02T18:34:19.741Z] > authorizing via signed-in user (ericjnielson2@gmail.com)
+[debug] [2025-03-02T18:34:19.742Z] [iam] checking project portfolio for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2025-03-02T18:34:19.743Z] Checked if tokens are valid: false, expires at: 1740929555373
+[debug] [2025-03-02T18:34:19.744Z] Checked if tokens are valid: false, expires at: 1740929555373
+[debug] [2025-03-02T18:34:19.744Z] > refreshing access token with scopes: []
+[debug] [2025-03-02T18:34:19.746Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-03-02T18:34:19.747Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-03-02T18:34:19.959Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-03-02T18:34:19.959Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-03-02T18:34:19.970Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/portfolio:testIamPermissions [none]
+[debug] [2025-03-02T18:34:19.971Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/portfolio:testIamPermissions x-goog-quota-user=projects/portfolio
+[debug] [2025-03-02T18:34:19.971Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/portfolio:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-03-02T18:34:20.228Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/portfolio:testIamPermissions 200
+[debug] [2025-03-02T18:34:20.228Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/portfolio:testIamPermissions {}
+[debug] [2025-03-02T18:34:20.229Z] [iam] error while checking permissions, command may fail: Authorization failed. This account is missing the following required permissions on project portfolio:
+
+  firebase.projects.get
+  firebasehosting.sites.update
+[debug] [2025-03-02T18:34:20.231Z] Checked if tokens are valid: true, expires at: 1740944058959
+[debug] [2025-03-02T18:34:20.231Z] Checked if tokens are valid: true, expires at: 1740944058959
+[debug] [2025-03-02T18:34:20.232Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/portfolio [none]
+[debug] [2025-03-02T18:34:20.529Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/portfolio 403
+[debug] [2025-03-02T18:34:20.529Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/portfolio {"error":{"code":403,"message":"The caller does not have permission","status":"PERMISSION_DENIED"}}
+[debug] [2025-03-02T18:34:20.532Z] Request to https://firebase.googleapis.com/v1beta1/projects/portfolio had HTTP Error: 403, The caller does not have permission
+[debug] [2025-03-02T18:34:20.534Z] FirebaseError: Request to https://firebase.googleapis.com/v1beta1/projects/portfolio had HTTP Error: 403, The caller does not have permission
+    at responseToError (/nix/store/2id8zx3wi2gh8x4pd02cyri43q3i6ll2-firebase-tools-13.29.3/lib/node_modules/firebase-tools/lib/responseToError.js:52:12)
+    at RetryOperation._fn (/nix/store/2id8zx3wi2gh8x4pd02cyri43q3i6ll2-firebase-tools-13.29.3/lib/node_modules/firebase-tools/lib/apiv2.js:312:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[error] 
+[error] Error: Failed to get Firebase project portfolio. Please make sure the project exists and your account has permission to access it.

@@ -39,8 +39,12 @@ app = Flask(__name__,
 
 # Configure app with minimal settings
 app.config['SECRET_KEY'] = os.urandom(24)
-# Don't set SERVER_NAME as it can cause routing issues in Cloud Run
-app.config.pop('SERVER_NAME', None)
+
+# Don't pop SERVER_NAME - this is causing your error
+# Instead, just ensure it's not set if we don't want it
+if 'SERVER_NAME' in app.config:
+    app.config['SERVER_NAME'] = None
+
 app.config['PREFERRED_URL_SCHEME'] = 'https'
 app.config['APPLICATION_ROOT'] = '/'
 
@@ -591,6 +595,7 @@ def is_port_in_use(port):
 
 def run_app(port):
     try:
+        # Ensure eventlet is properly patched
         eventlet.monkey_patch()
         
         # Set buffer size for frame data
