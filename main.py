@@ -18,6 +18,7 @@ from typing import Dict, List
 import time
 import logging
 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -286,7 +287,7 @@ def generate_colors():
                 messages=[
                     {"role": "user", "content": prompt}
                 ],                
-                max_tokens=1024,
+                max_tokens=100,
                 temperature=0.7,
                 timeout=20  # 20-second timeout for the API call
             )
