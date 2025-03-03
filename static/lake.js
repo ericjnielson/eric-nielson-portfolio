@@ -227,6 +227,7 @@ async function cloudRunFetch(url, options = {}, maxRetries = 3) {
 function canMakeRequest() {
     const now = Date.now();
     if (requestInProgress || now - lastRequestTime < REQUEST_COOLDOWN) {
+        console.log("Request throttled, please wait a moment");
         return false;
     }
     return true;
@@ -240,7 +241,6 @@ async function startTraining() {
     }
     
     if (!canMakeRequest()) {
-        console.log("Request throttled, please wait a moment");
         showNotification("Please wait a moment before trying again", true);
         return;
     }
@@ -303,7 +303,6 @@ async function stopTraining(force = false) {
     }
     
     if (!force && !canMakeRequest()) {
-        console.log("Request throttled, please wait a moment");
         return;
     }
     
