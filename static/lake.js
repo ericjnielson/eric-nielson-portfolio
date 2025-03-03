@@ -15,7 +15,7 @@ let socketConnected = false;
 
 // DOM Elements
 const startButton = document.getElementById('startTraining');
-const stopButton = document.getElementById('stopTraining'); // Fixed ID to match HTML
+const stopButton = document.getElementById('stopTraining');
 const saveButton = document.getElementById('saveModel');
 const loadButton = document.getElementById('loadModel');
 const randomizeButton = document.getElementById('randomizeMap');
@@ -37,30 +37,46 @@ const successRate = document.getElementById('successRate');
 let isTraining = false;
 let retryCount = 0;
 const MAX_RETRIES = 5;
+let requestsInProgress = 0; // Track ongoing requests
 
 // Update slider value displays
 function updateSliderDisplay(slider, display) {
+    if (!slider || !display) return; // Guard against null elements
     display.textContent = Number(slider.value).toFixed(
         slider.id === 'learningRate' ? 4 : 3
     );
 }
 
 // Initialize slider displays
-updateSliderDisplay(learningRateSlider, learningRateValue);
-updateSliderDisplay(discountFactorSlider, discountFactorValue);
-updateSliderDisplay(explorationRateSlider, explorationRateValue);
+if (learningRateSlider && learningRateValue) {
+    updateSliderDisplay(learningRateSlider, learningRateValue);
+}
+if (discountFactorSlider && discountFactorValue) {
+    updateSliderDisplay(discountFactorSlider, discountFactorValue);
+}
+if (explorationRateSlider && explorationRateValue) {
+    updateSliderDisplay(explorationRateSlider, explorationRateValue);
+}
 
 // Add input event listeners
-learningRateSlider.addEventListener('input', () => updateSliderDisplay(learningRateSlider, learningRateValue));
-discountFactorSlider.addEventListener('input', () => updateSliderDisplay(discountFactorSlider, discountFactorValue));
-explorationRateSlider.addEventListener('input', () => updateSliderDisplay(explorationRateSlider, explorationRateValue));
+if (learningRateSlider && learningRateValue) {
+    learningRateSlider.addEventListener('input', () => updateSliderDisplay(learningRateSlider, learningRateValue));
+}
+if (discountFactorSlider && discountFactorValue) {
+    discountFactorSlider.addEventListener('input', () => updateSliderDisplay(discountFactorSlider, discountFactorValue));
+}
+if (explorationRateSlider && explorationRateValue) {
+    explorationRateSlider.addEventListener('input', () => updateSliderDisplay(explorationRateSlider, explorationRateValue));
+}
 
 // Socket event handlers with improved error handling
 socket.on('connect', () => {
     console.log('Socket connected successfully');
     console.log('Transport type:', socket.io.engine.transport.name);
-    modelStatus.textContent = 'Connected';
-    modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+    if (modelStatus) {
+        modelStatus.textContent = 'Connected';
+        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+    }
     socketConnected = true;
     retryCount = 0;
     
@@ -70,8 +86,10 @@ socket.on('connect', () => {
 
 socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error);
-    modelStatus.textContent = 'Connection Error';
-    modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+    if (modelStatus) {
+        modelStatus.textContent = 'Connection Error';
+        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+    }
     socketConnected = false;
     
     // Alert the user about connection issues if retries exhausted
@@ -82,8 +100,10 @@ socket.on('connect_error', (error) => {
 
 socket.on('disconnect', (reason) => {
     console.log('Socket disconnected:', reason);
-    modelStatus.textContent = 'Disconnected';
-    modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
+    if (modelStatus) {
+        modelStatus.textContent = 'Disconnected';
+        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
+    }
     socketConnected = false;
     
     // If training is in progress, try to stop it through regular HTTP
@@ -123,74 +143,82 @@ socket.on('training_complete', (data) => {
 });
 
 socket.on('training_error', (data) => {
-    showNotification(data.error, true);
+    showNotification(data.error || 'Unknown training error occurred', true);
     stopTraining();
 });
 
-// Fallback HTTP communication for environments where WebSockets fail
-async function updateStateViaHTTP() {
-    if (!socketConnected) {
+socket.on('error', (error) => {
+    console.error('Socket error:', error);
+    showNotification('Socket error: ' + (error.message || 'Unknown error'), true);
+});
+
+// Fetch with timeout and retry capability
+async function fetchWithTimeout(url, options = {}, timeout = 15000, retries = 2) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    options.signal = controller.signal;
+    
+    let attemptCount = 0;
+    let lastError;
+    
+    while (attemptCount <= retries) {
         try {
-            await updateCurrentState();
+            requestsInProgress++;
+            const response = await fetch(url, options);
+            clearTimeout(timeoutId);
+            requestsInProgress--;
+            return response;
         } catch (error) {
-            console.error("Error updating state via HTTP:", error);
+            lastError = error;
+            console.error(`Fetch attempt ${attemptCount + 1} failed:`, error);
+            
+            if (error.name === 'AbortError') {
+                console.warn(`Request to ${url} timed out`);
+            }
+            
+            attemptCount++;
+            
+            if (attemptCount <= retries) {
+                // Wait before retrying (exponential backoff)
+                const delay = Math.min(1000 * Math.pow(2, attemptCount), 10000);
+                console.log(`Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        } finally {
+            if (attemptCount > retries) {
+                requestsInProgress--;
+            }
         }
     }
-}
-
-// Set up periodic state updates (every 10 seconds) as a fallback
-const stateUpdateInterval = setInterval(updateStateViaHTTP, 10000);
-
-// Add authorization headers to all fetch requests
-function fetchWithAuth(url, options = {}) {
-    // Get the current URL to extract authentication parameters
-    const currentUrl = window.location.href;
-    const urlObj = new URL(currentUrl);
     
-    // Check for any auth tokens in the URL
-    const token = urlObj.searchParams.get('token') || localStorage.getItem('authToken');
-    
-    // Set up default headers
-    const headers = {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        ...options.headers
-    };
-    
-    // Add token if available
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    // Add CSRF protection if needed
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    if (csrfToken) {
-        headers['X-CSRF-Token'] = csrfToken;
-    }
-    
-    // Merge with original options
-    const fetchOptions = {
-        ...options,
-        headers,
-        credentials: 'include', // Include cookies
-        mode: 'cors' // Enable CORS
-    };
-    
-    return fetch(url, fetchOptions);
+    throw lastError;
 }
 
 // Training control functions with improved error handling
 async function startTraining() {
     try {
+        if (isTraining || requestsInProgress > 0) {
+            console.log("Training already in progress or requests pending, ignoring start request");
+            return;
+        }
+        
         console.log("Starting training...");
-        const response = await fetchWithAuth('/start_training', {
-            method: 'POST',
-            body: JSON.stringify({
-                learning_rate: parseFloat(learningRateSlider.value),
-                discount_factor: parseFloat(discountFactorSlider.value),
-                exploration_rate: parseFloat(explorationRateSlider.value)
-            })
+        startButton.disabled = true;
+        
+        const body = JSON.stringify({
+            learning_rate: parseFloat(learningRateSlider.value),
+            discount_factor: parseFloat(discountFactorSlider.value),
+            exploration_rate: parseFloat(explorationRateSlider.value)
         });
+        
+        const response = await fetchWithTimeout('/start_training', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: body
+        }, 30000, 1); // 30s timeout, 1 retry
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -200,25 +228,35 @@ async function startTraining() {
         const data = await response.json();
         
         isTraining = true;
-        startButton.disabled = true;
-        stopButton.disabled = false;
-        randomizeButton.disabled = true;
-        mapSizeSelect.disabled = true;
-        modelStatus.textContent = 'Training';
-        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
+        if (startButton) startButton.disabled = true;
+        if (stopButton) stopButton.disabled = false;
+        if (randomizeButton) randomizeButton.disabled = true;
+        if (mapSizeSelect) mapSizeSelect.disabled = true;
+        
+        if (modelStatus) {
+            modelStatus.textContent = 'Training';
+            modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
+        }
 
     } catch (error) {
         console.error("Start training error:", error);
         showNotification('Error starting training: ' + error.message, true);
+        if (startButton) startButton.disabled = false;
     }
 }
 
 async function stopTraining() {
     try {
         console.log("Stopping training...");
-        const response = await fetchWithAuth('/stop_training', {
-            method: 'POST'
-        });
+        if (stopButton) stopButton.disabled = true;
+        
+        const response = await fetchWithTimeout('/stop_training', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        }, 30000, 1); // 30s timeout, 1 retry
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -228,15 +266,20 @@ async function stopTraining() {
         const data = await response.json();
         
         isTraining = false;
-        startButton.disabled = false;
-        stopButton.disabled = true;
-        randomizeButton.disabled = false;
-        mapSizeSelect.disabled = false;
-        modelStatus.textContent = 'Model Ready';
-        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+        if (startButton) startButton.disabled = false;
+        if (stopButton) stopButton.disabled = true;
+        if (randomizeButton) randomizeButton.disabled = false;
+        if (mapSizeSelect) mapSizeSelect.disabled = false;
+        
+        if (modelStatus) {
+            modelStatus.textContent = 'Model Ready';
+            modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+        }
 
         // Get final state update
-        updateCurrentState();
+        setTimeout(() => {
+            updateCurrentState();
+        }, 1000);
 
     } catch (error) {
         console.error("Stop training error:", error);
@@ -244,60 +287,101 @@ async function stopTraining() {
         
         // Reset UI even on error to allow restart
         isTraining = false;
-        startButton.disabled = false;
-        stopButton.disabled = true;
-        randomizeButton.disabled = false;
-        mapSizeSelect.disabled = false;
+        if (startButton) startButton.disabled = false;
+        if (stopButton) stopButton.disabled = true;
+        if (randomizeButton) randomizeButton.disabled = false;
+        if (mapSizeSelect) mapSizeSelect.disabled = false;
     }
 }
 
 async function randomizeMap() {
     try {
-        console.log("Randomizing map...");
-        randomizeButton.disabled = true;
+        if (isTraining || requestsInProgress > 0) {
+            console.log("Training or requests in progress, cannot randomize map");
+            showNotification("Cannot randomize map while training or other operations are in progress", true);
+            return;
+        }
         
-        const response = await fetchWithAuth('/randomize_map', {
+        console.log("Randomizing map...");
+        if (randomizeButton) randomizeButton.disabled = true;
+        
+        // Get the selected map size safely
+        let mapSize = 8; // Default size
+        if (mapSizeSelect && mapSizeSelect.value) {
+            const sizeValue = parseInt(mapSizeSelect.value);
+            if (!isNaN(sizeValue) && sizeValue > 0) {
+                mapSize = sizeValue;
+            }
+        }
+        
+        const response = await fetchWithTimeout('/randomize_map', {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
-                size: parseInt(mapSizeSelect.value)
+                size: mapSize
             })
-        });
+        }, 30000, 2); // 30s timeout, 2 retries - line 343 that's causing issues
 
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to randomize map (${response.status}): ${errorText}`);
         }
 
-        const data = await response.json();
-        
-        // If we got frame data directly, use it
-        if (data.frame) {
-            updateVisualization(data.frame);
-            if (data.metrics) {
-                updateMetrics(data.metrics);
+        try {
+            const data = await response.json();
+            
+            // If we got frame data directly, use it
+            if (data.frame) {
+                updateVisualization(data.frame);
+                if (data.metrics) {
+                    updateMetrics(data.metrics);
+                }
+                showNotification('Map randomized successfully');
+            } else {
+                // Otherwise get current state
+                await updateCurrentState();
+                showNotification('Map randomized, updating state...');
             }
-        } else {
-            // Otherwise get current state
+        } catch (jsonError) {
+            console.error("Error parsing randomize response:", jsonError);
+            // Still try to update state
             await updateCurrentState();
+            showNotification('Map may have been randomized but could not parse response');
         }
-        
-        showNotification('Map randomized successfully');
 
     } catch (error) {
         console.error("Randomize map error:", error);
         showNotification('Error randomizing map: ' + error.message, true);
+        
+        // Try to update current state anyway
+        try {
+            await updateCurrentState();
+        } catch (stateError) {
+            console.error("Additional error getting state:", stateError);
+        }
     } finally {
-        randomizeButton.disabled = false;
+        if (randomizeButton) randomizeButton.disabled = false;
     }
 }
 
 async function saveModelState() {
     try {
-        saveButton.disabled = true;
+        if (isTraining || requestsInProgress > 0) {
+            showNotification("Cannot save model while training or other operations are in progress", true);
+            return;
+        }
         
-        const response = await fetchWithAuth('/save_model', {
-            method: 'POST'
-        });
+        if (saveButton) saveButton.disabled = true;
+        
+        const response = await fetchWithTimeout('/save_model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        }, 20000, 1);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -305,22 +389,31 @@ async function saveModelState() {
         }
 
         const data = await response.json();
-        
         showNotification('Model saved successfully');
     } catch (error) {
+        console.error("Save model error:", error);
         showNotification('Error saving model: ' + error.message, true);
     } finally {
-        saveButton.disabled = false;
+        if (saveButton) saveButton.disabled = false;
     }
 }
 
 async function loadModelState() {
     try {
-        loadButton.disabled = true;
+        if (isTraining || requestsInProgress > 0) {
+            showNotification("Cannot load model while training or other operations are in progress", true);
+            return;
+        }
         
-        const response = await fetchWithAuth('/load_model', {
-            method: 'POST'
-        });
+        if (loadButton) loadButton.disabled = true;
+        
+        const response = await fetchWithTimeout('/load_model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        }, 20000, 1);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -332,9 +425,10 @@ async function loadModelState() {
         await updateCurrentState();
         showNotification('Model loaded successfully');
     } catch (error) {
+        console.error("Load model error:", error);
         showNotification('Error loading model: ' + error.message, true);
     } finally {
-        loadButton.disabled = false;
+        if (loadButton) loadButton.disabled = false;
     }
 }
 
@@ -342,19 +436,21 @@ async function loadModelState() {
 function updateMetrics(metrics) {
     if (!metrics) return;
     
-    avgReward.textContent = (metrics.average_reward || 0).toFixed(2);
-    episodeCount.textContent = metrics.episode_count || 0;
-    successRate.textContent = `${(metrics.success_rate || 0).toFixed(1)}%`;
+    if (avgReward) avgReward.textContent = (metrics.average_reward || 0).toFixed(2);
+    if (episodeCount) episodeCount.textContent = metrics.episode_count || 0;
+    if (successRate) successRate.textContent = `${(metrics.success_rate || 0).toFixed(1)}%`;
     
-    // Update progress bar (assuming max_episodes as goal)
-    const maxEpisodes = metrics.max_episodes || 1000;
-    const progress = (metrics.episode_count / maxEpisodes) * 100;
-    trainingProgress.style.width = `${Math.min(progress, 100)}%`;
+    // Update progress bar
+    if (trainingProgress) {
+        const maxEpisodes = metrics.max_episodes || 1000;
+        const progress = (metrics.episode_count / maxEpisodes) * 100;
+        trainingProgress.style.width = `${Math.min(progress, 100)}%`;
+    }
 }
 
 function updateVisualization(frameData) {
-    if (!frameData) {
-        console.warn("No frame data provided");
+    if (!frameData || !environmentVisualization) {
+        console.warn("No frame data provided or visualization element not found");
         return;
     }
 
@@ -365,7 +461,8 @@ function updateVisualization(frameData) {
         }
 
         // Create and add new visualization
-        const img = document.createElement('img');
+        const img = new Image();
+        
         img.onload = () => {
             console.log(`Image loaded successfully: ${img.width}x${img.height}`);
         };
@@ -386,6 +483,7 @@ function updateVisualization(frameData) {
             environmentVisualization.appendChild(fallbackDiv);
         };
         
+        // Set source after defining event handlers
         img.src = `data:image/jpeg;base64,${frameData}`;
         img.className = 'w-full h-full object-contain';
         environmentVisualization.appendChild(img);
@@ -396,7 +494,14 @@ function updateVisualization(frameData) {
 
 async function updateCurrentState() {
     try {
-        const response = await fetchWithAuth('/get_state');
+        const response = await fetchWithTimeout('/get_state', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            }
+        }, 15000, 1);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -450,7 +555,14 @@ function showNotification(message, isError = false) {
 // Initialize backend health check
 async function checkBackendHealth() {
     try {
-        const response = await fetchWithAuth('/health');
+        const response = await fetch('/get_state', { 
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
         if (response.ok) {
             console.log('Backend is healthy');
             return true;
@@ -464,19 +576,33 @@ async function checkBackendHealth() {
     }
 }
 
-// Event Listeners
-startButton.addEventListener('click', startTraining);
-stopButton.addEventListener('click', stopTraining);
-saveButton.addEventListener('click', saveModelState);
-loadButton.addEventListener('click', loadModelState);
-randomizeButton.addEventListener('click', randomizeMap);
-mapSizeSelect.addEventListener('change', () => {
-    // Don't automatically randomize on change - just update the UI
-    console.log(`Map size changed to ${mapSizeSelect.value}x${mapSizeSelect.value}`);
-});
+// Event Listeners with guards against null elements
+if (startButton) {
+    startButton.addEventListener('click', startTraining);
+}
+if (stopButton) {
+    stopButton.addEventListener('click', stopTraining);
+}
+if (saveButton) {
+    saveButton.addEventListener('click', saveModelState);
+}
+if (loadButton) {
+    loadButton.addEventListener('click', loadModelState);
+}
+if (randomizeButton) {
+    randomizeButton.addEventListener('click', randomizeMap);
+}
+if (mapSizeSelect) {
+    mapSizeSelect.addEventListener('change', () => {
+        // Don't automatically randomize on change - just update the UI
+        console.log(`Map size changed to ${mapSizeSelect.value}x${mapSizeSelect.value}`);
+    });
+}
 
 // Initialize
-stopButton.disabled = true;
+if (stopButton) {
+    stopButton.disabled = true;
+}
 console.log('Initializing RL training interface');
 
 // Check backend health before initializing
@@ -484,8 +610,10 @@ checkBackendHealth().then(isHealthy => {
     if (isHealthy) {
         updateCurrentState();
     } else {
-        modelStatus.textContent = 'Backend Unavailable';
-        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+        if (modelStatus) {
+            modelStatus.textContent = 'Backend Unavailable';
+            modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+        }
         showNotification('Backend service is unavailable. Please try again later.', true);
     }
 });
@@ -497,19 +625,18 @@ document.addEventListener('visibilitychange', () => {
         stopTraining();
     } else if (!document.hidden) {
         console.log('Page visible, updating state');
-        updateCurrentState();
+        setTimeout(() => {
+            updateCurrentState();
+        }, 1000);
     }
 });
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
-    // Clear any intervals
-    clearInterval(stateUpdateInterval);
-    
     // Stop training if active
     if (isTraining) {
         console.log('Page unloading, stopping training');
-        navigator.sendBeacon('/stop_training', '{}');
+        navigator.sendBeacon('/stop_training', JSON.stringify({}));
         isTraining = false;
     }
 });
