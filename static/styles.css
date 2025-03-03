@@ -688,11 +688,7 @@ form {
     .input-group {
         flex-direction: column;
     }
-    
-    .input-group input,
-    .input-group button {
-        width: 100%;
-    }
+
     
     .color-swatch {
         width: calc(50% - 1rem);
@@ -2711,7 +2707,6 @@ body {
 }
 
 .input-group input {
-    width: 100%;
     padding: 12px;
     border: 1px solid #ddd;
     border-radius: 6px;
