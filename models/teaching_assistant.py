@@ -168,7 +168,7 @@ class ProjectManagementTA:
                     model="claude-3-5-sonnet-20241022",  
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=600,  # Reduced for faster response
-                    temperature=0.3,  # Lower temperature for more deterministic responses
+                    temperature=0.6,  # Lower temperature for more deterministic responses
                     # Note: Don't set API timeout directly in Cloud Run - it can cause issues
                 )
                 
