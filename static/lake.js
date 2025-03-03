@@ -38,6 +38,9 @@ let isTraining = false;
 let retryCount = 0;
 const MAX_RETRIES = 5;
 let requestsInProgress = 0; // Track ongoing requests
+let lastRequestTime = 0; // Track when the last request was made
+const MIN_REQUEST_INTERVAL = 2000; // Minimum time between requests (ms)
+let initialStateLoaded = false; // Track if initial state has been loaded
 
 // Update slider value displays
 function updateSliderDisplay(slider, display) {
@@ -80,8 +83,10 @@ socket.on('connect', () => {
     socketConnected = true;
     retryCount = 0;
     
-    // Request initial state update when connected
-    updateCurrentState();
+    // Request initial state update when connected, but only if we haven't already loaded the state
+    if (!initialStateLoaded) {
+        setTimeout(() => updateCurrentState(), 500);
+    }
 });
 
 socket.on('connect_error', (error) => {
@@ -152,47 +157,31 @@ socket.on('error', (error) => {
     showNotification('Socket error: ' + (error.message || 'Unknown error'), true);
 });
 
-// Fetch with timeout and retry capability
-async function fetchWithTimeout(url, options = {}, timeout = 15000, retries = 2) {
+// Simple fetch with shorter timeout
+async function simpleFetch(url, options = {}, timeout = 5000) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
     
     options.signal = controller.signal;
     
-    let attemptCount = 0;
-    let lastError;
-    
-    while (attemptCount <= retries) {
-        try {
-            requestsInProgress++;
-            const response = await fetch(url, options);
-            clearTimeout(timeoutId);
-            requestsInProgress--;
-            return response;
-        } catch (error) {
-            lastError = error;
-            console.error(`Fetch attempt ${attemptCount + 1} failed:`, error);
-            
-            if (error.name === 'AbortError') {
-                console.warn(`Request to ${url} timed out`);
-            }
-            
-            attemptCount++;
-            
-            if (attemptCount <= retries) {
-                // Wait before retrying (exponential backoff)
-                const delay = Math.min(1000 * Math.pow(2, attemptCount), 10000);
-                console.log(`Retrying in ${delay}ms...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            }
-        } finally {
-            if (attemptCount > retries) {
-                requestsInProgress--;
-            }
-        }
+    try {
+        requestsInProgress++;
+        const response = await fetch(url, options);
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        throw error;
+    } finally {
+        requestsInProgress--;
+        clearTimeout(timeoutId);
     }
-    
-    throw lastError;
+}
+
+// Throttle function to prevent too many requests
+function shouldThrottleRequest() {
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+    return timeSinceLastRequest < MIN_REQUEST_INTERVAL;
 }
 
 // Training control functions with improved error handling
@@ -203,39 +192,52 @@ async function startTraining() {
             return;
         }
         
+        if (shouldThrottleRequest()) {
+            console.log("Request throttled, please try again in a moment");
+            return;
+        }
+        
+        lastRequestTime = Date.now();
         console.log("Starting training...");
-        startButton.disabled = true;
+        if (startButton) startButton.disabled = true;
         
         const body = JSON.stringify({
-            learning_rate: parseFloat(learningRateSlider.value),
-            discount_factor: parseFloat(discountFactorSlider.value),
-            exploration_rate: parseFloat(explorationRateSlider.value)
+            learning_rate: parseFloat(learningRateSlider?.value || 0.001),
+            discount_factor: parseFloat(discountFactorSlider?.value || 0.99),
+            exploration_rate: parseFloat(explorationRateSlider?.value || 0.1)
         });
-        
-        const response = await fetchWithTimeout('/start_training', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: body
-        }, 30000, 1); // 30s timeout, 1 retry
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to start training (${response.status}): ${errorText}`);
-        }
+        try {
+            requestsInProgress++;
+            const response = await fetch('/start_training', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: body
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to start training (${response.status}): ${errorText}`);
+            }
 
-        const data = await response.json();
-        
-        isTraining = true;
-        if (startButton) startButton.disabled = true;
-        if (stopButton) stopButton.disabled = false;
-        if (randomizeButton) randomizeButton.disabled = true;
-        if (mapSizeSelect) mapSizeSelect.disabled = true;
-        
-        if (modelStatus) {
-            modelStatus.textContent = 'Training';
-            modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
+            const data = await response.json();
+            
+            isTraining = true;
+            if (startButton) startButton.disabled = true;
+            if (stopButton) stopButton.disabled = false;
+            if (randomizeButton) randomizeButton.disabled = true;
+            if (mapSizeSelect) mapSizeSelect.disabled = true;
+            
+            if (modelStatus) {
+                modelStatus.textContent = 'Training';
+                modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
+            }
+        } catch (error) {
+            throw error;
+        } finally {
+            requestsInProgress--;
         }
 
     } catch (error) {
@@ -247,24 +249,38 @@ async function startTraining() {
 
 async function stopTraining() {
     try {
+        if (shouldThrottleRequest()) {
+            console.log("Request throttled, please try again in a moment");
+            return;
+        }
+        
+        lastRequestTime = Date.now();
         console.log("Stopping training...");
         if (stopButton) stopButton.disabled = true;
         
-        const response = await fetchWithTimeout('/stop_training', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({})
-        }, 30000, 1); // 30s timeout, 1 retry
+        try {
+            requestsInProgress++;
+            const response = await fetch('/stop_training', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to stop training (${response.status}): ${errorText}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to stop training (${response.status}): ${errorText}`);
+            }
+
+            await response.json();
+        } catch (error) {
+            console.warn("Error stopping training, but continuing UI reset:", error);
+        } finally {
+            requestsInProgress--;
         }
-
-        const data = await response.json();
         
+        // Always reset UI state regardless of response
         isTraining = false;
         if (startButton) startButton.disabled = false;
         if (stopButton) stopButton.disabled = true;
@@ -295,16 +311,26 @@ async function stopTraining() {
 }
 
 async function randomizeMap() {
+    if (isTraining) {
+        showNotification("Cannot randomize map while training is in progress", true);
+        return;
+    }
+    
+    if (requestsInProgress > 0) {
+        showNotification("Please wait for current operation to complete", true);
+        return;
+    }
+    
+    if (shouldThrottleRequest()) {
+        showNotification("Please wait a moment before trying again", true);
+        return;
+    }
+    
+    lastRequestTime = Date.now();
+    console.log("Randomizing map...");
+    if (randomizeButton) randomizeButton.disabled = true;
+    
     try {
-        if (isTraining || requestsInProgress > 0) {
-            console.log("Training or requests in progress, cannot randomize map");
-            showNotification("Cannot randomize map while training or other operations are in progress", true);
-            return;
-        }
-        
-        console.log("Randomizing map...");
-        if (randomizeButton) randomizeButton.disabled = true;
-        
         // Get the selected map size safely
         let mapSize = 8; // Default size
         if (mapSizeSelect && mapSizeSelect.value) {
@@ -314,7 +340,8 @@ async function randomizeMap() {
             }
         }
         
-        const response = await fetchWithTimeout('/randomize_map', {
+        requestsInProgress++;
+        const response = await fetch('/randomize_map', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -322,112 +349,110 @@ async function randomizeMap() {
             body: JSON.stringify({
                 size: mapSize
             })
-        }, 30000, 2); // 30s timeout, 2 retries - line 343 that's causing issues
+        });
 
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to randomize map (${response.status}): ${errorText}`);
         }
 
+        let data;
         try {
-            const data = await response.json();
-            
-            // If we got frame data directly, use it
-            if (data.frame) {
-                updateVisualization(data.frame);
-                if (data.metrics) {
-                    updateMetrics(data.metrics);
-                }
-                showNotification('Map randomized successfully');
-            } else {
-                // Otherwise get current state
-                await updateCurrentState();
-                showNotification('Map randomized, updating state...');
-            }
+            data = await response.json();
         } catch (jsonError) {
             console.error("Error parsing randomize response:", jsonError);
-            // Still try to update state
-            await updateCurrentState();
-            showNotification('Map may have been randomized but could not parse response');
+            throw new Error("Received invalid response from server");
         }
-
+        
+        // Update UI with received data
+        if (data && data.frame) {
+            updateVisualization(data.frame);
+            if (data.metrics) {
+                updateMetrics(data.metrics);
+            }
+            showNotification('Map randomized successfully');
+        } else {
+            // If we didn't get frame data, try to update the state separately
+            await updateCurrentState();
+            showNotification('Map randomized, updating state...');
+        }
     } catch (error) {
         console.error("Randomize map error:", error);
         showNotification('Error randomizing map: ' + error.message, true);
-        
-        // Try to update current state anyway
-        try {
-            await updateCurrentState();
-        } catch (stateError) {
-            console.error("Additional error getting state:", stateError);
-        }
     } finally {
+        requestsInProgress--;
         if (randomizeButton) randomizeButton.disabled = false;
     }
 }
 
 async function saveModelState() {
+    if (isTraining || requestsInProgress > 0 || shouldThrottleRequest()) {
+        showNotification("Cannot save model right now, please try again in a moment", true);
+        return;
+    }
+    
+    lastRequestTime = Date.now();
+    if (saveButton) saveButton.disabled = true;
+    
     try {
-        if (isTraining || requestsInProgress > 0) {
-            showNotification("Cannot save model while training or other operations are in progress", true);
-            return;
-        }
-        
-        if (saveButton) saveButton.disabled = true;
-        
-        const response = await fetchWithTimeout('/save_model', {
+        requestsInProgress++;
+        const response = await fetch('/save_model', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({})
-        }, 20000, 1);
+        });
         
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to save model (${response.status}): ${errorText}`);
         }
 
-        const data = await response.json();
+        await response.json();
         showNotification('Model saved successfully');
     } catch (error) {
         console.error("Save model error:", error);
         showNotification('Error saving model: ' + error.message, true);
     } finally {
+        requestsInProgress--;
         if (saveButton) saveButton.disabled = false;
     }
 }
 
 async function loadModelState() {
+    if (isTraining || requestsInProgress > 0 || shouldThrottleRequest()) {
+        showNotification("Cannot load model right now, please try again in a moment", true);
+        return;
+    }
+    
+    lastRequestTime = Date.now();
+    if (loadButton) loadButton.disabled = true;
+    
     try {
-        if (isTraining || requestsInProgress > 0) {
-            showNotification("Cannot load model while training or other operations are in progress", true);
-            return;
-        }
-        
-        if (loadButton) loadButton.disabled = true;
-        
-        const response = await fetchWithTimeout('/load_model', {
+        requestsInProgress++;
+        const response = await fetch('/load_model', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({})
-        }, 20000, 1);
+        });
         
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to load model (${response.status}): ${errorText}`);
         }
 
-        const data = await response.json();
+        await response.json();
         
-        await updateCurrentState();
+        setTimeout(() => updateCurrentState(), 1000);
         showNotification('Model loaded successfully');
     } catch (error) {
         console.error("Load model error:", error);
         showNotification('Error loading model: ' + error.message, true);
     } finally {
+        requestsInProgress--;
         if (loadButton) loadButton.disabled = false;
     }
 }
@@ -492,16 +517,28 @@ function updateVisualization(frameData) {
     }
 }
 
+// Using direct fetch with minimal timeout
 async function updateCurrentState() {
+    if (requestsInProgress > 0 || shouldThrottleRequest()) {
+        console.log("Skipping state update - another request is in progress or throttled");
+        return;
+    }
+    
+    lastRequestTime = Date.now();
     try {
-        const response = await fetchWithTimeout('/get_state', {
-            method: 'GET',
+        requestsInProgress++;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // Short 3-second timeout
+        
+        const response = await fetch('/get_state', {
+            signal: controller.signal,
             headers: {
-                'Content-Type': 'application/json',
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache'
             }
-        }, 15000, 1);
+        });
+        
+        clearTimeout(timeoutId);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -511,16 +548,36 @@ async function updateCurrentState() {
         const data = await response.json();
         updateMetrics(data.metrics);
         if (data.frame) {
-            console.log('Got frame from state update, updating visualization');
             updateVisualization(data.frame);
+        }
+        
+        initialStateLoaded = true;
+        
+        if (modelStatus && modelStatus.textContent !== 'Training') {
+            modelStatus.textContent = 'Model Ready';
+            modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
         }
     } catch (error) {
         console.error('Error getting current state:', error);
         
-        // Only show notification for non-network errors to avoid spamming the user
-        if (!error.message.includes('Failed to fetch') && !error.message.includes('NetworkError')) {
+        // Set fallback state if we couldn't get the actual state
+        if (!initialStateLoaded) {
+            if (modelStatus) {
+                if (error.name === 'AbortError') {
+                    modelStatus.textContent = 'Connection Timeout';
+                } else {
+                    modelStatus.textContent = 'Connection Error';
+                }
+                modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+            }
+        }
+        
+        // Only show notification for critical errors
+        if (error.name !== 'AbortError' && !error.message.includes('Failed to fetch')) {
             showNotification('Error getting current state: ' + error.message, true);
         }
+    } finally {
+        requestsInProgress--;
     }
 }
 
@@ -555,13 +612,16 @@ function showNotification(message, isError = false) {
 // Initialize backend health check
 async function checkBackendHealth() {
     try {
+        // Use a short timeout for the health check
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        
         const response = await fetch('/get_state', { 
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache'
-            }
+            signal: controller.signal,
+            headers: { 'Cache-Control': 'no-cache' }
         });
+        
+        clearTimeout(timeoutId);
         
         if (response.ok) {
             console.log('Backend is healthy');
@@ -608,13 +668,16 @@ console.log('Initializing RL training interface');
 // Check backend health before initializing
 checkBackendHealth().then(isHealthy => {
     if (isHealthy) {
-        updateCurrentState();
+        // Wait a short time before updating state
+        setTimeout(() => {
+            updateCurrentState();
+        }, 500);
     } else {
         if (modelStatus) {
             modelStatus.textContent = 'Backend Unavailable';
             modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
         }
-        showNotification('Backend service is unavailable. Please try again later.', true);
+        showNotification('Backend service is unreachable or slow to respond. Please try again later.', true);
     }
 });
 
@@ -623,8 +686,9 @@ document.addEventListener('visibilitychange', () => {
     if (document.hidden && isTraining) {
         console.log('Page hidden, stopping training');
         stopTraining();
-    } else if (!document.hidden) {
+    } else if (!document.hidden && initialStateLoaded) {
         console.log('Page visible, updating state');
+        // Add a delay to avoid immediate requests on tab focus
         setTimeout(() => {
             updateCurrentState();
         }, 1000);
