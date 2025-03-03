@@ -130,6 +130,19 @@ class TeachingAssistantUI {
                 if (!data) {
                     throw new Error('No feedback data received');
                 }
+                
+                // Log the received data for debugging
+                console.log('Received feedback data:', data);
+                
+                // Ensure the data has the expected structure
+                if (!data.metrics) {
+                    console.warn('Feedback data is missing metrics property. Adding empty metrics object.');
+                    data.metrics = {
+                        content_coverage: 0.0,
+                        critical_thinking: 0.0,
+                        practical_application: 0.0
+                    };
+                }
     
                 return data;
     
@@ -206,32 +219,51 @@ class TeachingAssistantUI {
     
     displayFeedback(feedback) {
         try {
+            // Log the received feedback data for debugging
+            console.log('Received feedback data:', feedback);
+            
             // Update text feedback sections
             const sections = {
                 'positiveFeedback': feedback.positive_feedback || feedback.positive,
                 'developmentFeedback': feedback.areas_for_development || feedback.development,
                 'connectionsFeedback': feedback.future_connections || feedback.connections
             };
-
+    
             for (const [id, text] of Object.entries(sections)) {
                 const element = document.getElementById(id);
                 if (element) {
                     element.textContent = text || 'No feedback available';
                 }
             }
-
-            // Update metrics
+    
+            // Update metrics with improved handling
             const metrics = feedback.metrics || {};
+            console.log('Processing metrics:', metrics);
+            
             const metricElements = {
                 'contentScore': metrics.content_coverage,
                 'thinkingScore': metrics.critical_thinking,
                 'applicationScore': metrics.practical_application
             };
-
+    
             for (const [id, value] of Object.entries(metricElements)) {
                 const element = document.getElementById(id);
                 if (element) {
-                    element.textContent = value ? `${Math.round(value * 100)}%` : 'N/A';
+                    if (value !== undefined && value !== null) {
+                        // Ensure value is a number between 0 and 1
+                        let numValue = parseFloat(value);
+                        if (isNaN(numValue)) {
+                            element.textContent = 'N/A';
+                        } else {
+                            // Convert to percentage
+                            if (numValue > 1) {
+                                numValue = numValue / 100; // Handle if value is already a percentage (e.g., 85 instead of 0.85)
+                            }
+                            element.textContent = `${Math.round(numValue * 100)}%`;
+                        }
+                    } else {
+                        element.textContent = 'N/A';
+                    }
                 }
             }
         } catch (error) {

@@ -251,26 +251,42 @@ class ProjectManagementTA:
                 elif line.startswith("FUTURE_CONNECTIONS:"):
                     current_section = "future_connections"
                     feedback[current_section] = line.split(":", 1)[1].strip()
-                elif line == "METRICS:":
+                elif line == "METRICS:" or line.startswith("METRICS:"):
                     current_section = None
                     metrics_started = True
                 elif metrics_started:
-                    # Handle metrics section
-                    if "content_coverage:" in line:
-                        try:
-                            feedback["metrics"]["content_coverage"] = float(line.split(":")[1].strip())
-                        except (ValueError, IndexError):
-                            pass
-                    elif "critical_thinking:" in line:
-                        try:
-                            feedback["metrics"]["critical_thinking"] = float(line.split(":")[1].strip())
-                        except (ValueError, IndexError):
-                            pass
-                    elif "practical_application:" in line:
-                        try:
-                            feedback["metrics"]["practical_application"] = float(line.split(":")[1].strip())
-                        except (ValueError, IndexError):
-                            pass
+                    # Handle metrics section with improved parsing
+                    if ":" in line:
+                        key, value = line.split(":", 1)
+                        key = key.strip().lower()
+                        value = value.strip()
+                        
+                        # Map common metric keys to our expected keys
+                        metric_map = {
+                            "content_coverage": "content_coverage",
+                            "content coverage": "content_coverage",
+                            "critical_thinking": "critical_thinking",
+                            "critical thinking": "critical_thinking",
+                            "practical_application": "practical_application",
+                            "practical application": "practical_application"
+                        }
+                        
+                        if key in metric_map:
+                            try:
+                                # Convert percentage to decimal if needed (e.g., "85%" to 0.85)
+                                if "%" in value:
+                                    value = value.replace("%", "").strip()
+                                    value = float(value) / 100
+                                else:
+                                    value = float(value)
+                                    
+                                # Ensure value is between 0 and 1
+                                if value > 1:
+                                    value = value / 100
+                                    
+                                feedback["metrics"][metric_map[key]] = value
+                            except (ValueError, IndexError):
+                                print(f"Could not parse metric value: {value} for key: {key}")
                 # Add content to current section if we're not in metrics
                 elif current_section and not metrics_started:
                     feedback[current_section] += " " + line
@@ -278,7 +294,18 @@ class ProjectManagementTA:
             # Clean up any double spaces
             for section in ["positive_feedback", "areas_for_development", "future_connections"]:
                 feedback[section] = " ".join(feedback[section].split())
-                
+            
+            # Ensure metrics are properly formatted
+            for key in feedback["metrics"]:
+                if isinstance(feedback["metrics"][key], float):
+                    # Ensure value is between 0 and 1
+                    if feedback["metrics"][key] > 1:
+                        feedback["metrics"][key] = feedback["metrics"][key] / 100
+                    # Ensure value is not negative
+                    if feedback["metrics"][key] < 0:
+                        feedback["metrics"][key] = 0
+            
+            print(f"Parsed feedback metrics: {feedback['metrics']}")
             return feedback
             
         except Exception as e:
