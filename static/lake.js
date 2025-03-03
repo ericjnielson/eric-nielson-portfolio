@@ -1,28 +1,25 @@
-// Initialize Socket.IO with Cloud Run optimizations
+// lake.js - Full implementation with improved error handling and connection management
+
+// Initialize Socket.IO with improved connection handling
 const socket = io({
     path: '/ws/socket.io',
-    transports: ['polling', 'websocket'], // Start with polling which is more reliable for initial connection
+    transports: ['polling', 'websocket'],
     reconnection: true,
-    reconnectionAttempts: 15,    // Increased for Cloud Run
+    reconnectionAttempts: 15,
     reconnectionDelay: 1000,
-    reconnectionDelayMax: 10000, // Longer max delay for Cloud Run scaling
-    timeout: 30000,              // Longer timeout for cold starts
-    forceNew: true,              // Force new connection to avoid stale connections
-    query: {                     // Add timestamp to avoid caching issues
-        t: Date.now()
-    }
+    reconnectionDelayMax: 10000,
+    timeout: 30000,
+    forceNew: true
 });
 
-// Connection state and request management
+// Connection state management
 let socketConnected = false;
 let requestInProgress = false;
 let lastRequestTime = 0;
-const REQUEST_COOLDOWN = 1500;   // Increased cooldown for Cloud Run
-const HEALTH_CHECK_INTERVAL = 30000; // Regular health checks every 30s
-let healthCheckTimer = null;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
-let initialStateLoaded = false;
+const REQUEST_COOLDOWN = 1000; // Milliseconds to wait between requests
+const CONNECTION_RETRY_DELAY = 2000; // Milliseconds to wait before retrying connection
+let retryTimeout = null;
+let errorDisplayed = false; // Avoid multiple error notifications
 
 // DOM Elements
 const startButton = document.getElementById('startTraining');
@@ -46,30 +43,6 @@ const successRate = document.getElementById('successRate');
 
 // Training state
 let isTraining = false;
-
-// Add a health check ping function for Cloud Run
-function startHealthCheck() {
-    if (healthCheckTimer) clearInterval(healthCheckTimer);
-    
-    healthCheckTimer = setInterval(() => {
-        if (socketConnected) {
-            // Send a lightweight ping to keep connection alive
-            socket.emit('ping', { timestamp: Date.now() });
-        } else if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            reconnectAttempts++;
-            console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
-            socket.connect();
-        }
-    }, HEALTH_CHECK_INTERVAL);
-}
-
-// Add function to stop health check
-function stopHealthCheck() {
-    if (healthCheckTimer) {
-        clearInterval(healthCheckTimer);
-        healthCheckTimer = null;
-    }
-}
 
 // Update slider value displays
 function updateSliderDisplay(slider, display) {
@@ -101,51 +74,80 @@ if (explorationRateSlider && explorationRateValue) {
     explorationRateSlider.addEventListener('input', () => updateSliderDisplay(explorationRateSlider, explorationRateValue));
 }
 
+// Socket connection management
+function updateConnectionStatus(status, className) {
+    if (modelStatus) {
+        modelStatus.textContent = status;
+        modelStatus.className = className;
+    }
+}
+
+// Rate limiting helper
+function canMakeRequest() {
+    const now = Date.now();
+    if (requestInProgress || (now - lastRequestTime < REQUEST_COOLDOWN)) {
+        console.log("Request throttled, please wait a moment");
+        return false;
+    }
+    return true;
+}
+
 // Socket event handlers
 socket.on('connect', () => {
     console.log('Socket connected successfully');
     console.log('Transport type:', socket.io.engine.transport.name);
-    if (modelStatus) {
-        modelStatus.textContent = 'Connected';
-        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
-    }
+    updateConnectionStatus('Connected', 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800');
     socketConnected = true;
-    reconnectAttempts = 0;
+    errorDisplayed = false;
     
-    // Start health check
-    startHealthCheck();
+    // Clear any retry timeouts
+    if (retryTimeout) {
+        clearTimeout(retryTimeout);
+        retryTimeout = null;
+    }
     
     // Request initial state update when connected
-    if (!initialStateLoaded) {
-        // Longer delay for Cloud Run cold start
-        setTimeout(() => updateCurrentState(), 2000);
-    }
+    setTimeout(() => updateCurrentState(), 500);
 });
 
 socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error);
-    if (modelStatus) {
-        modelStatus.textContent = 'Connection Error';
-        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
-    }
+    updateConnectionStatus('Connection Error', 'px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800');
     socketConnected = false;
     
-    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        showNotification('Connection error: Unable to connect to server. The server may be restarting or experiencing high load.', true);
+    // Show error message only once
+    if (!errorDisplayed) {
+        showNotification('Connection error. The server may be restarting or unreachable.', true);
+        errorDisplayed = true;
+    }
+    
+    // Schedule a reconnect attempt
+    if (!retryTimeout) {
+        retryTimeout = setTimeout(() => {
+            console.log("Attempting to reconnect...");
+            socket.connect();
+            retryTimeout = null;
+        }, CONNECTION_RETRY_DELAY);
     }
 });
 
 socket.on('disconnect', (reason) => {
     console.log('Socket disconnected:', reason);
-    if (modelStatus) {
-        modelStatus.textContent = 'Disconnected';
-        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
-    }
+    updateConnectionStatus('Disconnected', 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800');
     socketConnected = false;
     
     // If training is in progress, try to stop it
     if (isTraining) {
-        stopTraining(true); // Force stop
+        stopTraining(true); // Force stop without making request
+    }
+    
+    // Schedule a reconnect attempt
+    if (!retryTimeout) {
+        retryTimeout = setTimeout(() => {
+            console.log("Attempting to reconnect after disconnect...");
+            socket.connect();
+            retryTimeout = null;
+        }, CONNECTION_RETRY_DELAY);
     }
 });
 
@@ -169,7 +171,7 @@ socket.on('training_complete', (data) => {
 });
 
 socket.on('training_error', (data) => {
-    showNotification(data.error || 'An error occurred during training', true);
+    showNotification(data.error, true);
     stopTraining();
 });
 
@@ -177,71 +179,43 @@ socket.on('error', (error) => {
     console.error('Socket error:', error);
 });
 
-socket.on('pong', () => {
-    console.log('Received pong from server - connection active');
-});
-
-// Cloud Run optimized fetch with exponential backoff
-async function cloudRunFetch(url, options = {}, maxRetries = 3) {
-    let retries = 0;
+// Improved fetch with timeouts and error handling
+async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
     
-    while (retries < maxRetries) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), options.timeout || 10000);
-            
-            options.signal = controller.signal;
-            options.headers = {
-                ...options.headers,
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            };
-            
-            const response = await fetch(url, options);
-            clearTimeout(timeoutId);
-            
-            if (response.status === 429 || response.status >= 500) {
-                // Server overloaded or error - retry with backoff
-                retries++;
-                const backoff = Math.min(1000 * Math.pow(2, retries), 10000); // Exponential backoff
-                await new Promise(r => setTimeout(r, backoff));
-                continue;
-            }
-            
-            return response;
-        } catch (error) {
-            if (error.name === 'AbortError' || retries >= maxRetries - 1) {
-                throw error;
-            }
-            
-            retries++;
-            const backoff = Math.min(1000 * Math.pow(2, retries), 10000);
-            await new Promise(r => setTimeout(r, backoff));
-        }
-    }
+    const defaultOptions = {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        signal: controller.signal
+    };
     
-    throw new Error(`Failed after ${maxRetries} retries`);
-}
-
-// Rate limiting helper
-function canMakeRequest() {
-    const now = Date.now();
-    if (requestInProgress || now - lastRequestTime < REQUEST_COOLDOWN) {
-        console.log("Request throttled, please wait a moment");
-        return false;
+    try {
+        const response = await fetch(url, { ...defaultOptions, ...options });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
     }
-    return true;
 }
 
 // Training control functions
 async function startTraining() {
+    if (!socketConnected) {
+        showNotification("Cannot start training: not connected to server", true);
+        return;
+    }
+    
     if (isTraining) {
-        console.log("Training already in progress, ignoring start request");
+        console.log("Training already in progress");
         return;
     }
     
     if (!canMakeRequest()) {
-        showNotification("Please wait a moment before trying again", true);
+        showNotification("Please wait a moment before starting training", true);
         return;
     }
     
@@ -250,47 +224,37 @@ async function startTraining() {
         requestInProgress = true;
         lastRequestTime = Date.now();
         
-        if (startButton) startButton.disabled = true;
-        
-        // Prepare request data
-        const requestData = {
-            learning_rate: parseFloat(learningRateSlider?.value || 0.001),
-            discount_factor: parseFloat(discountFactorSlider?.value || 0.99),
-            exploration_rate: parseFloat(explorationRateSlider?.value || 0.1)
-        };
-        
-        const response = await cloudRunFetch('/start_training', {
+        const response = await fetchWithTimeout('/start_training', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestData),
-            timeout: 15000  // Longer timeout for training start
-        }, 2);  // Only 2 retries for training to avoid duplicated starts
+            body: JSON.stringify({
+                learning_rate: parseFloat(learningRateSlider?.value || 0.001),
+                discount_factor: parseFloat(discountFactorSlider?.value || 0.99),
+                exploration_rate: parseFloat(explorationRateSlider?.value || 0.1)
+            })
+        }, 15000); // Longer timeout for training start
         
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server error: ${response.status} - ${errorText}`);
+            const errorData = await response.text();
+            throw new Error(`Server error: ${response.status} - ${errorData}`);
         }
         
-        await response.json();
+        const data = await response.json();
         
-        // Update UI state
         isTraining = true;
         if (startButton) startButton.disabled = true;
         if (stopButton) stopButton.disabled = false;
         if (randomizeButton) randomizeButton.disabled = true;
         if (mapSizeSelect) mapSizeSelect.disabled = true;
         
-        if (modelStatus) {
-            modelStatus.textContent = 'Training';
-            modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
-        }
+        updateConnectionStatus('Training', 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800');
         
     } catch (error) {
         console.error("Start training error:", error);
-        showNotification('Error starting training: ' + error.message, true);
-        
-        // Re-enable the button regardless of the outcome
-        if (startButton) startButton.disabled = false;
+        if (error.name === 'AbortError') {
+            showNotification('Request timed out. The server may be busy.', true);
+        } else {
+            showNotification('Error starting training: ' + error.message, true);
+        }
     } finally {
         requestInProgress = false;
     }
@@ -298,11 +262,12 @@ async function startTraining() {
 
 async function stopTraining(force = false) {
     if (!isTraining && !force) {
-        console.log("No training in progress, ignoring stop request");
+        console.log("No training in progress");
         return;
     }
     
     if (!force && !canMakeRequest()) {
+        showNotification("Please wait a moment before stopping training", true);
         return;
     }
     
@@ -312,59 +277,52 @@ async function stopTraining(force = false) {
         if (!force) {
             requestInProgress = true;
             lastRequestTime = Date.now();
-        }
-        
-        if (stopButton) stopButton.disabled = true;
-        
-        // Only make the request if not forced or if socketConnected
-        if (!force || socketConnected) {
+            
             try {
-                const response = await cloudRunFetch('/stop_training', {
+                const response = await fetchWithTimeout('/stop_training', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}),
-                    timeout: 8000  // Shorter timeout for stopping
-                }, 2);
+                    body: JSON.stringify({})
+                }, 8000); // Shorter timeout for stopping
                 
                 if (!response.ok) {
                     console.warn(`Stop training response not OK: ${response.status}`);
                 }
-            } catch (requestError) {
-                console.warn("Error during stop request:", requestError);
+            } catch (error) {
+                console.warn("Error during stop request:", error);
                 // Continue with UI updates even if request fails
             }
         }
-    } catch (error) {
-        console.error("Error in stop training:", error);
     } finally {
-        // Always update UI state regardless of success/failure
+        // Always update UI state
         isTraining = false;
         if (startButton) startButton.disabled = false;
         if (stopButton) stopButton.disabled = true;
         if (randomizeButton) randomizeButton.disabled = false;
         if (mapSizeSelect) mapSizeSelect.disabled = false;
         
-        if (modelStatus) {
-            modelStatus.textContent = 'Model Ready';
-            modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
-        }
+        updateConnectionStatus('Model Ready', 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800');
         
         if (!force) {
             requestInProgress = false;
             // Update current state after a delay
-            setTimeout(() => updateCurrentState(), 1000);
+            setTimeout(() => updateCurrentState(), 500);
         }
     }
 }
 
 async function randomizeMap() {
+    if (!socketConnected) {
+        showNotification("Cannot randomize map: not connected to server", true);
+        return;
+    }
+    
     if (isTraining) {
         showNotification("Cannot randomize map while training", true);
         return;
     }
     
     if (!canMakeRequest()) {
-        showNotification("Please wait a moment before trying again", true);
+        showNotification("Please wait a moment before randomizing map", true);
         return;
     }
     
@@ -375,15 +333,12 @@ async function randomizeMap() {
         
         if (randomizeButton) randomizeButton.disabled = true;
         
-        // Get selected map size (with validation)
-        const mapSize = parseInt(mapSizeSelect?.value || 8);
-        
-        const response = await cloudRunFetch('/randomize_map', {
+        const response = await fetchWithTimeout('/randomize_map', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ size: mapSize }),
-            timeout: 10000
-        }, 3);
+            body: JSON.stringify({
+                size: parseInt(mapSizeSelect?.value || 8)
+            })
+        }, 10000);
         
         if (!response.ok) {
             throw new Error(`Server error: ${response.status}`);
@@ -405,7 +360,11 @@ async function randomizeMap() {
         
     } catch (error) {
         console.error("Randomize map error:", error);
-        showNotification('Error randomizing map: ' + error.message, true);
+        if (error.name === 'AbortError') {
+            showNotification('Request timed out. The server may be busy.', true);
+        } else {
+            showNotification('Error randomizing map: ' + error.message, true);
+        }
     } finally {
         requestInProgress = false;
         if (randomizeButton) randomizeButton.disabled = false;
@@ -413,8 +372,18 @@ async function randomizeMap() {
 }
 
 async function saveModelState() {
-    if (isTraining || !canMakeRequest()) {
-        showNotification("Cannot save model right now", true);
+    if (!socketConnected) {
+        showNotification("Cannot save model: not connected to server", true);
+        return;
+    }
+    
+    if (isTraining) {
+        showNotification("Cannot save model while training", true);
+        return;
+    }
+    
+    if (!canMakeRequest()) {
+        showNotification("Please wait a moment before saving model", true);
         return;
     }
     
@@ -424,12 +393,10 @@ async function saveModelState() {
         
         if (saveButton) saveButton.disabled = true;
         
-        const response = await cloudRunFetch('/save_model', {
+        const response = await fetchWithTimeout('/save_model', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
-            timeout: 10000
-        }, 3);
+            body: JSON.stringify({})
+        }, 10000);
         
         if (!response.ok) {
             throw new Error(`Server error: ${response.status}`);
@@ -440,7 +407,11 @@ async function saveModelState() {
         
     } catch (error) {
         console.error("Save model error:", error);
-        showNotification('Error saving model: ' + error.message, true);
+        if (error.name === 'AbortError') {
+            showNotification('Request timed out. The server may be busy.', true);
+        } else {
+            showNotification('Error saving model: ' + error.message, true);
+        }
     } finally {
         requestInProgress = false;
         if (saveButton) saveButton.disabled = false;
@@ -448,8 +419,18 @@ async function saveModelState() {
 }
 
 async function loadModelState() {
-    if (isTraining || !canMakeRequest()) {
-        showNotification("Cannot load model right now", true);
+    if (!socketConnected) {
+        showNotification("Cannot load model: not connected to server", true);
+        return;
+    }
+    
+    if (isTraining) {
+        showNotification("Cannot load model while training", true);
+        return;
+    }
+    
+    if (!canMakeRequest()) {
+        showNotification("Please wait a moment before loading model", true);
         return;
     }
     
@@ -459,12 +440,10 @@ async function loadModelState() {
         
         if (loadButton) loadButton.disabled = true;
         
-        const response = await cloudRunFetch('/load_model', {
+        const response = await fetchWithTimeout('/load_model', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
-            timeout: 10000
-        }, 3);
+            body: JSON.stringify({})
+        }, 10000);
         
         if (!response.ok) {
             throw new Error(`Server error: ${response.status}`);
@@ -473,12 +452,16 @@ async function loadModelState() {
         await response.json();
         
         // Update state after loading
-        setTimeout(() => updateCurrentState(), 1000);
+        setTimeout(() => updateCurrentState(), 500);
         showNotification("Model loaded successfully");
         
     } catch (error) {
         console.error("Load model error:", error);
-        showNotification('Error loading model: ' + error.message, true);
+        if (error.name === 'AbortError') {
+            showNotification('Request timed out. The server may be busy.', true);
+        } else {
+            showNotification('Error loading model: ' + error.message, true);
+        }
     } finally {
         requestInProgress = false;
         if (loadButton) loadButton.disabled = false;
@@ -520,6 +503,7 @@ function updateVisualization(frameData) {
         
         img.onerror = (e) => {
             console.error("Error loading image:", e);
+            // Show a fallback when image fails to load
             showFallbackVisualization();
         };
         
@@ -527,7 +511,7 @@ function updateVisualization(frameData) {
         img.className = 'w-full h-full object-contain';
         environmentVisualization.appendChild(img);
     } catch (error) {
-        console.error("Error updating visualization:", error);
+        console.error("Error in updateVisualization:", error);
         showFallbackVisualization();
     }
 }
@@ -553,6 +537,11 @@ function showFallbackVisualization() {
 }
 
 async function updateCurrentState() {
+    if (!socketConnected) {
+        console.log("Cannot update state: not connected to server");
+        return;
+    }
+    
     if (requestInProgress) {
         console.log("Skipping state update - another request is in progress");
         return;
@@ -562,9 +551,7 @@ async function updateCurrentState() {
         requestInProgress = true;
         lastRequestTime = Date.now();
         
-        const response = await cloudRunFetch('/get_state', {
-            timeout: 5000,  // Short timeout for state updates
-        }, 2);  // Fewer retries for state updates
+        const response = await fetchWithTimeout('/get_state', {}, 5000);
         
         if (!response.ok) {
             throw new Error(`Failed to get state: ${response.status}`);
@@ -577,21 +564,19 @@ async function updateCurrentState() {
             updateVisualization(data.frame);
         }
         
-        initialStateLoaded = true;
-        
     } catch (error) {
         console.error('Error getting current state:', error);
-        
-        // Only show notification for non-timeout errors
         if (error.name !== 'AbortError') {
-            showNotification('Failed to get current state: ' + error.message, true);
+            // Only show notification for non-timeout errors to reduce noise
+            showNotification('Failed to update state: ' + error.message, true);
         }
     } finally {
         requestInProgress = false;
     }
 }
 
-// Notification function
+// Improved notification function with debouncing for errors
+let notificationTimeout = null;
 function showNotification(message, isError = false) {
     // Remove any existing notifications
     const existingNotifications = document.querySelectorAll('.notification-message');
@@ -599,10 +584,15 @@ function showNotification(message, isError = false) {
         notification.remove();
     });
     
+    // Clear any pending notification timeouts
+    if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+    }
+    
     const notification = document.createElement('div');
     notification.className = `notification-message fixed top-4 right-4 px-6 py-3 rounded-lg text-white ${
         isError ? 'bg-red-600' : 'bg-green-600'
-    } shadow-lg z-50 transition-opacity duration-300 opacity-0 max-w-md`;
+    } shadow-lg z-50 transition-opacity duration-300 opacity-0`;
     notification.textContent = message;
     
     document.body.appendChild(notification);
@@ -614,7 +604,7 @@ function showNotification(message, isError = false) {
     
     // Fade out and remove after delay
     const displayTime = isError ? 5000 : 3000;
-    setTimeout(() => {
+    notificationTimeout = setTimeout(() => {
         notification.style.opacity = '0';
         setTimeout(() => {
             if (notification.parentNode) {
@@ -641,7 +631,6 @@ if (randomizeButton) {
     randomizeButton.addEventListener('click', randomizeMap);
 }
 if (mapSizeSelect) {
-    // Don't automatically trigger map randomization on change
     mapSizeSelect.addEventListener('change', () => {
         console.log(`Map size selected: ${mapSizeSelect.value}x${mapSizeSelect.value}`);
     });
@@ -651,69 +640,36 @@ if (mapSizeSelect) {
 if (stopButton) {
     stopButton.disabled = true;
 }
-console.log('Initializing RL training interface for Cloud Run');
+console.log('Initializing RL training interface');
 
-// On page load, check server health and update initial state
-async function checkServerAndInitialize() {
-    try {
-        const response = await cloudRunFetch('/get_state', {
-            timeout: 10000  // Longer timeout for initial cold start
-        }, 3);
-        
-        if (response.ok) {
-            console.log('Server is available');
-            // Wait longer for Cloud Run initialization
-            setTimeout(() => updateCurrentState(), 2000);
-        } else {
-            console.warn('Server health check failed:', response.status);
-            showNotification('Server returned an error. Try reloading the page.', true);
-        }
-    } catch (error) {
-        console.error('Server health check error:', error);
-        if (error.name === 'AbortError') {
-            showNotification('Server is starting up (cold start). Please wait a moment and try again.', true);
-        } else {
-            showNotification('Failed to connect to server: ' + error.message, true);
-        }
-    }
-}
-
-// Start the initialization with longer delay for Cloud Run
-setTimeout(checkServerAndInitialize, 2000);
-
-// Handle page visibility changes for Cloud Run
+// Handle page visibility changes
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
         if (isTraining) {
             console.log('Page hidden, stopping training');
             stopTraining(true);
         }
-        
-        // Pause health checks when page is hidden to save resources
-        stopHealthCheck();
     } else {
-        // Resume health checks when page is visible
-        startHealthCheck();
-        
-        if (initialStateLoaded) {
-            console.log('Page visible, updating state');
-            // Longer delay for potential Cloud Run cold start
-            setTimeout(() => updateCurrentState(), 2000);
+        console.log('Page visible, updating state');
+        // Only update if connected
+        if (socketConnected) {
+            setTimeout(() => updateCurrentState(), 500);
+        } else {
+            // Try to reconnect if not connected
+            socket.connect();
         }
     }
 });
 
-// Cleanup on page unload for Cloud Run
+// Cleanup on page unload
 window.addEventListener('beforeunload', () => {
-    // Stop health checks
-    stopHealthCheck();
-    
     if (isTraining) {
         console.log('Page unloading, stopping training');
-        // Use a sync request for unload - more reliable for Cloud Run
+        // Use a sync request for unload
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/stop_training', false);  // false makes it synchronous
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.send(JSON.stringify({}));
+        isTraining = false;
     }
 });
