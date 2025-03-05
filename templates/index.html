@@ -7,6 +7,15 @@
     <!-- Try url_for first, fallback to direct path -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" onerror="this.onerror=null;this.href='/static/styles.css';">
 </head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-C7M0GTCBJX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-C7M0GTCBJX');
+</script>
 <body>
     <div class="profile-info">
         <!-- Use fallback pattern for images too -->
