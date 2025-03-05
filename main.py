@@ -17,21 +17,17 @@ import traceback
 from typing import Dict, List
 import time
 import logging
-
+from functools import lru_cache
+import threading
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Initialize empty values for lazy loading
-FORECASTER = None
-AGENT = None
-TRAINING_MANAGER = None
-TEACHING_ASSISTANT = None
-MODEL_INFO = None
-ENHANCED_DF = None
-ANTHROPIC_CLIENT = None
+# Initialize modules dict and lock for thread-safe lazy loading
+_modules = {}
+_modules_lock = threading.Lock()
 
 # Create the Flask app instance
 from flask import Flask, request, render_template, jsonify, url_for, send_from_directory, abort
@@ -42,6 +38,16 @@ app = Flask(__name__,
 
 # Configure app with minimal settings
 app.config['SECRET_KEY'] = os.urandom(24)
+app.config['PREFERRED_URL_SCHEME'] = 'https'
+app.config['APPLICATION_ROOT'] = '/'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+
+# Cache control for static files
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year in seconds
+
+# Enable debug mode only in development
+debug_mode = os.environ.get('FLASK_ENV') == 'development'
+app.debug = debug_mode
 
 # Enable secure headers
 @app.after_request
@@ -49,19 +55,19 @@ def add_header(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
+    
+    # Add caching headers for static files
+    if request.endpoint == 'static':
+        response.cache_control.max_age = 60 * 60 * 24 * 30  # 30 days
+        response.cache_control.public = True
+    
+    # Ensure CORS headers are present for API calls
+    if request.path.startswith('/api/'):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = '*'
+    
     return response
-
-# Don't set SERVER_NAME as it can cause routing issues in Cloud Run
-if 'SERVER_NAME' in app.config:
-    app.config['SERVER_NAME'] = None
-
-app.config['PREFERRED_URL_SCHEME'] = 'https'
-app.config['APPLICATION_ROOT'] = '/'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
-
-# Enable debug mode only in development
-debug_mode = os.environ.get('FLASK_ENV') == 'development'
-app.debug = debug_mode
 
 # Set up CORS - Light version
 from flask_cors import CORS
@@ -75,133 +81,163 @@ CORS(app, resources={
     }
 })
 
-# Initialize Socket.IO with optimized settings
-try:
-    from flask_socketio import SocketIO, emit
-    socketio = SocketIO(
-        app,
-        path='/ws/socket.io',
-        async_mode='threading',  # Changed from eventlet to threading
-        cors_allowed_origins="*",
-        logger=debug_mode,
-        engineio_logger=debug_mode,
-        ping_timeout=60,
-        ping_interval=25
-    )
-except ImportError:
-    logger.warning("SocketIO not available. Running without WebSocket support.")
-    socketio = None
-
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
-# Make sure static folder exists and log its path
-static_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
-os.makedirs(static_folder_path, exist_ok=True)
-logger.info(f"Static folder path: {static_folder_path}")
-
-# List static directory contents for debugging
-try:
-    static_files = os.listdir(static_folder_path)
-    logger.info(f"Static folder contents: {static_files}")
-except Exception as e:
-    logger.error(f"Error listing static folder contents: {str(e)}")
-
-# Add explicit route for static files with improved error handling
-@app.route('/static/<path:filename>')
-def custom_static(filename):
-    logger.info(f"Serving static file: {filename}")
-    try:
-        if not os.path.exists(os.path.join(app.static_folder, filename)):
-            logger.warning(f"Static file not found: {filename}")
-            return f"File not found: {filename}", 404
+# Create training manager class that doesn't rely on WebSockets
+class TrainingManager:
+    def __init__(self):
+        self.is_training = False
+        self.agent = None
+        self.training_thread = None
+        self.last_update = time.time()
         
-        return send_from_directory(app.static_folder, filename)
-    except Exception as e:
-        logger.error(f"Error serving static file {filename}: {str(e)}")
-        return f"Error serving file: {str(e)}", 500
+    def start_training(self, agent):
+        """Start training loop in a separate thread"""
+        logger.info("Starting training loop")
+        self.agent = agent
+        agent.training_complete = False  # Reset training flag
+        
+        def training_loop():
+            logger.info("Training loop started")
+            
+            while self.is_training:
+                try:
+                    # Check if training is complete
+                    if agent.training_complete:
+                        logger.info("Training complete! Stopping training loop.")
+                        self.is_training = False
+                        break
 
-def lazy_load_anthropic():
-    """Lazy load Anthropic client"""
-    global ANTHROPIC_CLIENT
-    if ANTHROPIC_CLIENT is None:
-        try:
-            import anthropic
-            api_key = os.getenv('ANTHROPIC_API_KEY')
-            if not api_key:
-                logger.warning("Anthropic API key not found")
-                api_key = "dummy_key_for_initialization"
-            ANTHROPIC_CLIENT = anthropic.Anthropic(api_key=api_key)
-            logger.info("Successfully initialized Anthropic client")
-        except Exception as e:
-            logger.error(f"Error initializing Anthropic client: {str(e)}")
-            ANTHROPIC_CLIENT = None
-    return ANTHROPIC_CLIENT
+                    # Run training episode
+                    agent.train_episode()
+                    self.last_update = time.time()
+                    
+                    # Log progress every 10 episodes
+                    metrics = agent.get_metrics()
+                    if metrics['episode_count'] % 10 == 0:
+                        logger.info(f"Episode {metrics['episode_count']}, success rate: {metrics['success_rate']:.1f}%")
+                    
+                    # Check if max episodes reached or success rate achieved
+                    if metrics['training_complete']:
+                        logger.info("Training complete by metrics! Stopping training loop.")
+                        self.is_training = False
+                        break
+                    
+                    # Control update frequency - don't update too fast
+                    time.sleep(0.1)
+                    
+                except Exception as e:
+                    logger.error(f"Error in training loop: {e}")
+                    traceback.print_exc()
+                    self.is_training = False
+                    break
+                
+        self.is_training = True
+        self.training_thread = threading.Thread(target=training_loop, daemon=True)
+        self.training_thread.start()
+        logger.info(f"Training thread started and is alive: {self.training_thread.is_alive()}")
+        
+    def stop_training(self):
+        """Stop the training loop"""
+        logger.info("Stopping training loop")
+        self.is_training = False
+        if self.training_thread and self.training_thread.is_alive():
+            # Don't join - could block, and daemon thread will terminate anyway
+            logger.info("Training thread will terminate")
 
-def lazy_load_forecaster():
-    """Lazy load RevenueForecast"""
-    global FORECASTER
-    if FORECASTER is None:
+# Start background preloading thread
+def start_preloading():
+    """Start preloading thread after app initialization"""
+    def preload_in_background():
         try:
-            from models.forecasting import RevenueForecast
-            FORECASTER = RevenueForecast()
-            logger.info("Successfully initialized forecaster")
+            logger.info("Starting background preloading of critical modules...")
+            # Preload prediction models first as they're most used
+            get_module('prediction_models')
+            logger.info("Preloading completed!")
         except Exception as e:
-            logger.error(f"Error initializing forecaster: {str(e)}")
-            FORECASTER = None
-    return FORECASTER
-
-def lazy_load_teaching_assistant():
-    """Lazy load teaching assistant"""
-    global TEACHING_ASSISTANT
-    if TEACHING_ASSISTANT is None:
-        try:
-            from models.teaching_assistant import ProjectManagementTA
-            TEACHING_ASSISTANT = ProjectManagementTA()
-            logger.info("Successfully initialized teaching assistant")
-        except Exception as e:
-            logger.error(f"Error initializing teaching assistant: {str(e)}")
+            logger.error(f"Error in preloading thread: {str(e)}")
             traceback.print_exc()
-            TEACHING_ASSISTANT = None
-    return TEACHING_ASSISTANT
+    
+    thread = threading.Thread(target=preload_in_background)
+    thread.daemon = True
+    thread.start()
+    logger.info("Preload thread started")
 
-def lazy_load_agent():
-    """Lazy load reinforcement learning agent"""
-    global AGENT, TRAINING_MANAGER
-    if AGENT is None:
+# Enhanced module loading system with thread safety
+def get_module(name):
+    """Thread-safe lazy loading of modules with caching"""
+    if name in _modules:
+        return _modules[name]
+    
+    with _modules_lock:
+        # Check again inside the lock
+        if name in _modules:
+            return _modules[name]
+            
         try:
-            from models.lake import FrozenLake
-            from models.training_manager import TrainingManager
-            AGENT = FrozenLake()
-            TRAINING_MANAGER = TrainingManager(socketio)
-            logger.info("Successfully initialized Frozen Lake agent")
+            start_time = time.time()
+            
+            if name == 'anthropic':
+                import anthropic
+                api_key = os.getenv('ANTHROPIC_API_KEY')
+                if not api_key:
+                    logger.warning("Anthropic API key not found")
+                    api_key = "dummy_key_for_initialization"
+                _modules[name] = anthropic.Anthropic(api_key=api_key)
+                
+            elif name == 'forecaster':
+                from models.forecasting import RevenueForecast
+                _modules[name] = RevenueForecast()
+                
+            elif name == 'teaching_assistant':
+                from models.teaching_assistant import ProjectManagementTA
+                _modules[name] = ProjectManagementTA()
+                
+            elif name == 'agent':
+                from models.lake import FrozenLake
+                _modules[name] = FrozenLake()
+                
+            elif name == 'training_manager':
+                _modules[name] = TrainingManager()
+                
+            elif name == 'prediction_models':
+                from models.predictor import model_info, enhanced_df, load_models
+                model_info, enhanced_df = load_models()
+                _modules['model_info'] = model_info
+                _modules['enhanced_df'] = enhanced_df
+                _modules[name] = True  # Mark as loaded
+                
+            load_time = time.time() - start_time
+            logger.info(f"Module '{name}' loaded in {load_time:.2f} seconds")
+            return _modules.get(name)
+            
         except Exception as e:
-            logger.error(f"Error initializing agent: {str(e)}")
+            logger.error(f"Error loading module '{name}': {str(e)}")
             traceback.print_exc()
-            AGENT = None
-            TRAINING_MANAGER = None
-    return AGENT, TRAINING_MANAGER
+            return None
 
-def lazy_load_prediction_models():
-    """Lazy load prediction models"""
-    global MODEL_INFO, ENHANCED_DF
-    if MODEL_INFO is None:
-        try:
-            from models.predictor import model_info, enhanced_df, load_models
-            MODEL_INFO, ENHANCED_DF = load_models()
-            logger.info("Successfully loaded prediction models and data")
-        except Exception as e:
-            logger.error(f"Error loading prediction models: {str(e)}")
-            traceback.print_exc()
-            MODEL_INFO = {}
-            ENHANCED_DF = None
-    return MODEL_INFO, ENHANCED_DF
+# Implement a simple in-memory cache
+cache = {}
+def cache_with_timeout(key, value, timeout=300):  # 5 minutes default
+    cache[key] = {
+        'value': value,
+        'expires': time.time() + timeout
+    }
+
+def get_cached(key):
+    if key in cache:
+        data = cache[key]
+        if time.time() < data['expires']:
+            return data['value']
+        else:
+            del cache[key]  # Clear expired entry
+    return None
 
 # Basic page routes - these don't need the complex models
 @app.route('/')
 def index():
-    logger.info("Rendering index.html")
     return render_template('index.html')
 
 @app.route('/Liveconnect')
@@ -252,7 +288,33 @@ def get_port():
 def health_check():
     return jsonify({"status": "ok", "timestamp": time.time()})
 
-# API routes with lazy loading
+# Add REST endpoint to get current training status
+@app.route('/api/training_status', methods=['GET'])
+def get_training_status():
+    """REST endpoint to get current training status"""
+    try:
+        agent = get_module('agent')
+        if not agent:
+            return jsonify({"error": "Agent not initialized"}), 503
+            
+        training_manager = get_module('training_manager')
+        is_training = training_manager and training_manager.is_training
+            
+        metrics = agent.get_metrics()
+        frame = agent.get_frame()
+        
+        return jsonify({
+            "training_active": is_training,
+            "metrics": metrics,
+            "frame": frame,
+            "server_time": time.time()
+        })
+    except Exception as e:
+        logger.error(f"Error getting training status: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# API routes with improved loading
 @app.route('/generate_colors', methods=['POST'])
 def generate_colors():
     try:
@@ -264,12 +326,18 @@ def generate_colors():
         if not msg:
             return jsonify({"error": "Input 'message' cannot be empty."}), 400
 
-        # Lazy load Anthropic client
-        client = lazy_load_anthropic()
+        # Check cache first
+        cache_key = f"colors_{msg}"
+        cached_result = get_cached(cache_key)
+        if cached_result:
+            return jsonify({"colors": cached_result})
+
+        # Get Anthropic client
+        import anthropic
+        client = get_module('anthropic')
         if not client:
             return jsonify({"error": "AI service not available"}), 503
 
-        import anthropic
         prompt = f"""
         You are a color palette generating assistant. Create a harmonious color palette based on this theme: {msg}
         Rules:
@@ -289,7 +357,7 @@ def generate_colors():
                 ],                
                 max_tokens=100,
                 temperature=0.7,
-                timeout=20  # 20-second timeout for the API call
+                timeout=15  # Reduced timeout
             )
             
             # Extract content from Anthropic's response structure
@@ -299,6 +367,8 @@ def generate_colors():
             if not colors:
                 return jsonify({"error": "No valid colors found in the API response."}), 500
 
+            # Cache the result for 1 day (86400 seconds)
+            cache_with_timeout(cache_key, colors, 86400)
             return jsonify({"colors": colors})
             
         except anthropic.APITimeoutError:
@@ -315,21 +385,34 @@ def generate_colors():
 @app.route('/api/teams')
 def get_teams():
     try:
-        _, enhanced_df = lazy_load_prediction_models()
+        # Check cache first
+        cached_teams = get_cached("cfb_teams")
+        if cached_teams:
+            return jsonify(cached_teams)
+            
+        # Ensure prediction models are loaded
+        get_module('prediction_models')
+        enhanced_df = _modules.get('enhanced_df')
         if enhanced_df is None:
             return jsonify({"error": "Team data not properly initialized"}), 500
             
         teams = []
         for _, row in enhanced_df.drop_duplicates(['homeTeam', 'home_conference']).iterrows():
             teams.append(f"{row['home_conference']} - {row['homeTeam']}")
-        return jsonify(sorted(set(teams)))
+        
+        sorted_teams = sorted(set(teams))
+        # Cache for 1 day
+        cache_with_timeout("cfb_teams", sorted_teams, 86400)
+        return jsonify(sorted_teams)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/predict', methods=['POST'])
 def predict():
     try:
-        _, enhanced_df = lazy_load_prediction_models()
+        # Ensure prediction models are loaded
+        get_module('prediction_models')
+        enhanced_df = _modules.get('enhanced_df')
         if enhanced_df is None:
             return jsonify({"error": "Prediction model not initialized"}), 503
             
@@ -339,6 +422,12 @@ def predict():
 
         home_team = data['homeTeam'].split(' - ')[-1]
         away_team = data['awayTeam'].split(' - ')[-1]
+        
+        # Check cache
+        cache_key = f"prediction_{home_team}_{away_team}"
+        cached_result = get_cached(cache_key)
+        if cached_result:
+            return jsonify(cached_result)
         
         available_home_teams = enhanced_df['homeTeam'].unique()
         available_away_teams = enhanced_df['awayTeam'].unique()
@@ -376,6 +465,9 @@ def predict():
                     'weights': details.get('weights', {})
                 }
             }
+            
+            # Cache for 1 day
+            cache_with_timeout(cache_key, response_data, 86400)
             return jsonify(response_data)
         else:
             return jsonify({"error": "Unable to generate prediction"}), 500
@@ -389,15 +481,27 @@ def predict():
 @app.route('/api/model-info')
 def get_model_info():
     try:
-        model_info, _ = lazy_load_prediction_models()
-        return jsonify({
+        # Check cache first
+        cached_info = get_cached("model_info")
+        if cached_info:
+            return jsonify(cached_info)
+            
+        # Ensure prediction models are loaded
+        get_module('prediction_models')
+        model_info = _modules.get('model_info')
+        
+        result = {
             'homeModel': {
                 'metrics': model_info['models']['homePoints']['metrics']
             },
             'awayModel': {
                 'metrics': model_info['models']['awayPoints']['metrics']
             }
-        })
+        }
+        
+        # Cache for 1 day
+        cache_with_timeout("model_info", result, 86400)
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -405,7 +509,7 @@ def get_model_info():
 @app.route('/api/analyze-post', methods=['POST'])
 def analyze_post():
     try:
-        teaching_assistant = lazy_load_teaching_assistant()
+        teaching_assistant = get_module('teaching_assistant')
         if not teaching_assistant:
             return jsonify({"error": "Teaching assistant not initialized"}), 503
             
@@ -420,7 +524,16 @@ def analyze_post():
         if not all([week, discussion, post]):
             return jsonify({"error": "Missing required fields"}), 400
             
+        # Check cache for identical posts
+        cache_key = f"post_analysis_{week}_{discussion}_{hash(post)}"
+        cached_result = get_cached(cache_key)
+        if cached_result:
+            return jsonify(cached_result)
+            
         feedback = teaching_assistant.analyze_post(week, discussion, post)
+        
+        # Cache for 1 hour
+        cache_with_timeout(cache_key, feedback, 3600)
         return jsonify(feedback)
             
     except Exception as e:
@@ -431,11 +544,20 @@ def analyze_post():
 @app.route('/api/week-content/<int:week>')
 def get_week_content(week):
     try:
-        teaching_assistant = lazy_load_teaching_assistant()
+        # Check cache first
+        cache_key = f"week_content_{week}"
+        cached_content = get_cached(cache_key)
+        if cached_content:
+            return jsonify(cached_content)
+            
+        teaching_assistant = get_module('teaching_assistant')
         if not teaching_assistant:
             return jsonify({"error": "Teaching assistant not initialized"}), 503
             
         content = teaching_assistant.get_week_content(week)
+        
+        # Cache for 1 day (content is static)
+        cache_with_timeout(cache_key, content, 86400)
         return jsonify(content)
     except Exception as e:
         logger.error(f"Error getting week content: {str(e)}")
@@ -446,8 +568,9 @@ def get_week_content(week):
 @app.route('/start_training', methods=['POST'])
 def start_training():
     try:
-        agent, training_manager = lazy_load_agent()
-        if not agent:
+        agent = get_module('agent')
+        training_manager = get_module('training_manager')
+        if not agent or not training_manager:
             return jsonify({"error": "Failed to initialize agent"}), 500
 
         data = request.get_json()
@@ -475,7 +598,7 @@ def start_training():
 @app.route('/stop_training', methods=['POST'])
 def stop_training():
     try:
-        _, training_manager = lazy_load_agent()
+        training_manager = get_module('training_manager')
         if training_manager:
             training_manager.stop_training()
         return jsonify({"status": "success"})
@@ -485,7 +608,7 @@ def stop_training():
 @app.route('/randomize_map', methods=['POST'])
 def randomize_map():
     try:
-        agent, _ = lazy_load_agent()
+        agent = get_module('agent')
         if not agent:
             return jsonify({"error": "Failed to initialize agent"}), 500
             
@@ -513,7 +636,7 @@ def randomize_map():
 @app.route('/get_state', methods=['GET'])
 def get_state():
     try:
-        agent, _ = lazy_load_agent()
+        agent = get_module('agent')
         if not agent:
             return jsonify({"error": "Agent not initialized"}), 500
             
@@ -522,7 +645,8 @@ def get_state():
             
         return jsonify({
             "metrics": metrics,
-            "frame": frame
+            "frame": frame,
+            "server_time": time.time()
         })
         
     except Exception as e:
@@ -533,7 +657,7 @@ def get_state():
 @app.route('/save_model', methods=['POST'])
 def save_model():
     try:
-        agent, _ = lazy_load_agent()
+        agent = get_module('agent')
         if agent:
             agent.save_model()
         return jsonify({"status": "success"})
@@ -543,18 +667,18 @@ def save_model():
 @app.route('/load_model', methods=['POST'])
 def load_model():
     try:
-        agent, _ = lazy_load_agent()
+        agent = get_module('agent')
         if agent:
             agent.load_model()
         return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-# Forecasting Routes
+# Forecasting Routes with caching
 @app.route('/api/forecast/internal', methods=['POST'])
 def handle_internal_forecast():
     try:
-        forecaster = lazy_load_forecaster()
+        forecaster = get_module('forecaster')
         if not forecaster:
             return jsonify({"error": "Forecasting module not initialized"}), 503
         return forecaster.handle_internal_forecast()
@@ -566,7 +690,7 @@ def handle_internal_forecast():
 @app.route('/api/forecast/upsell', methods=['POST'])
 def handle_upsell_forecast():
     try:
-        forecaster = lazy_load_forecaster()
+        forecaster = get_module('forecaster')
         if not forecaster:
             return jsonify({"error": "Forecasting module not initialized"}), 503
         return forecaster.handle_upsell_forecast()
@@ -578,7 +702,7 @@ def handle_upsell_forecast():
 @app.route('/api/forecast/market', methods=['POST'])
 def handle_market_forecast():
     try:
-        forecaster = lazy_load_forecaster()
+        forecaster = get_module('forecaster')
         if not forecaster:
             return jsonify({"error": "Forecasting module not initialized"}), 503
         return forecaster.handle_market_forecast()
@@ -590,7 +714,7 @@ def handle_market_forecast():
 @app.route('/api/forecast/satisfaction', methods=['POST'])
 def handle_satisfaction_forecast():
     try:
-        forecaster = lazy_load_forecaster()
+        forecaster = get_module('forecaster')
         if not forecaster:
             return jsonify({"error": "Forecasting module not initialized"}), 503
         return forecaster.handle_satisfaction_forecast()
@@ -598,18 +722,6 @@ def handle_satisfaction_forecast():
         logger.error(f"Error in satisfaction forecast: {str(e)}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-# Socket.IO event handlers
-@socketio.on('connect')
-def handle_connect():
-    logger.info('Client connected')
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    logger.info('Client disconnected')
-    agent, training_manager = lazy_load_agent()
-    if training_manager and training_manager.is_training:
-        training_manager.stop_training()
 
 def find_available_port(start_port=5000, max_attempts=100):
     """Find an available port starting from start_port"""
@@ -626,34 +738,12 @@ def is_port_in_use(port):
         except OSError:
             return True
 
-def run_app(port):
-    try:
-        # Ensure eventlet is properly patched
-        eventlet.monkey_patch()
-        
-        # Set buffer size for frame data
-        eventlet.wsgi.MAX_BUFFER_SIZE = 16777216  # 16MB
-        
-        logger.info(f"Starting server on port: {port}")
-        socketio.run(
-            app,
-            host='0.0.0.0',
-            port=port,
-            log_output=True,
-            use_reloader=False,
-            debug=True,
-            allow_unsafe_werkzeug=True
-        )
-    except Exception as e:
-        logger.error(f"Error starting server: {e}")
-        traceback.print_exc()
-
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     logger.info(f"Starting app on port {port}")
     
-    # If we have socket.io
-    if socketio:
-        socketio.run(app, host='0.0.0.0', port=port)
-    else:
-        app.run(host='0.0.0.0', port=port)
+    # Start preloading critical modules in background thread
+    start_preloading()
+    
+    # Start the Flask app
+    app.run(host='0.0.0.0', port=port)

@@ -1,10 +1,7 @@
-// Initialize state tracking variables
+// Initialize Variables
 let isTraining = false;
-let requestInProgress = false;
-let lastRequestTime = 0;
 let pollingInterval = null;
 const POLLING_INTERVAL_MS = 1000; // Poll every second
-const MIN_REQUEST_INTERVAL_MS = 500; // Minimum time between requests
 
 // DOM Elements
 const startButton = document.getElementById('startTraining');
@@ -43,12 +40,6 @@ learningRateSlider.addEventListener('input', () => updateSliderDisplay(learningR
 discountFactorSlider.addEventListener('input', () => updateSliderDisplay(discountFactorSlider, discountFactorValue));
 explorationRateSlider.addEventListener('input', () => updateSliderDisplay(explorationRateSlider, explorationRateValue));
 
-// Rate limiting for API requests
-function canMakeRequest() {
-    const now = Date.now();
-    return !requestInProgress && (now - lastRequestTime) > MIN_REQUEST_INTERVAL_MS;
-}
-
 // Function to start polling for updates
 function startPolling() {
     if (pollingInterval) {
@@ -56,50 +47,47 @@ function startPolling() {
     }
     
     pollingInterval = setInterval(async () => {
-        if (isTraining && canMakeRequest()) {
+        if (isTraining) {
             try {
-                requestInProgress = true;
-                lastRequestTime = Date.now();
-                
-                const response = await fetch('/get_state', {
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache'
-                    }
-                });
-                
+                const response = await fetch('/api/training_status');
                 if (response.ok) {
                     const data = await response.json();
                     
                     // Handle training data update
                     if (data.metrics) {
                         updateMetrics(data.metrics);
-                        
-                        // Check if training is complete
-                        if (data.metrics.training_complete) {
-                            console.log('Training complete (from polling)');
-                            stopPolling();
-                            stopTraining();
-                            showNotification('Training complete! ' + 
-                                `Success rate: ${data.metrics.success_rate.toFixed(1)}%, ` +
-                                `Episodes: ${data.metrics.episode_count}`);
-                        }
                     }
                     
                     if (data.frame) {
                         updateVisualization(data.frame);
                     }
+                    
+                    // Check if training is complete
+                    if (data.metrics && data.metrics.training_complete) {
+                        console.log('Training complete (from polling)');
+                        stopPolling();
+                        stopTraining();
+                        showNotification('Training complete! ' + 
+                            `Success rate: ${data.metrics.success_rate.toFixed(1)}%, ` +
+                            `Episodes: ${data.metrics.episode_count}`);
+                    }
+                    
+                    // Check if training is still active on server
+                    if (!data.training_active && isTraining) {
+                        console.log('Training stopped on server');
+                        stopTraining();
+                    }
                 }
-                
             } catch (error) {
-                console.error('Error during polling:', error);
-            } finally {
-                requestInProgress = false;
+                console.error('Error polling for training status:', error);
             }
+        } else {
+            // Stop polling if not training
+            stopPolling();
         }
     }, POLLING_INTERVAL_MS);
     
-    console.log('Started polling for training updates');
+    console.log('Polling started');
 }
 
 // Function to stop polling
@@ -107,7 +95,7 @@ function stopPolling() {
     if (pollingInterval) {
         clearInterval(pollingInterval);
         pollingInterval = null;
-        console.log('Stopped polling for training updates');
+        console.log('Polling stopped');
     }
 }
 
@@ -115,11 +103,6 @@ function stopPolling() {
 async function startTraining() {
     try {
         console.log("Starting training...");
-        
-        if (requestInProgress) return;
-        requestInProgress = true;
-        lastRequestTime = Date.now();
-        
         const response = await fetch('/start_training', {
             method: 'POST',
             headers: {
@@ -143,7 +126,9 @@ async function startTraining() {
         stopButton.disabled = false;
         randomizeButton.disabled = true;
         mapSizeSelect.disabled = true;
-        modelStatus.textContent = 'Training';
+        
+        // Update UI state
+        modelStatus.textContent = 'Training (REST API)';
         modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
         
         // Start polling for updates
@@ -152,19 +137,12 @@ async function startTraining() {
     } catch (error) {
         console.error("Start training error:", error);
         showNotification('Error starting training: ' + error.message, true);
-    } finally {
-        requestInProgress = false;
     }
 }
 
 async function stopTraining() {
     try {
         console.log("Stopping training...");
-        
-        if (requestInProgress) return;
-        requestInProgress = true;
-        lastRequestTime = Date.now();
-        
         const response = await fetch('/stop_training', {
             method: 'POST'
         });
@@ -180,11 +158,13 @@ async function stopTraining() {
         stopButton.disabled = true;
         randomizeButton.disabled = false;
         mapSizeSelect.disabled = false;
-        modelStatus.textContent = 'Model Ready';
-        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
         
-        // Stop polling
+        // Stop polling if active
         stopPolling();
+        
+        // Update status
+        modelStatus.textContent = 'REST API Ready';
+        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
 
         // Get final state update
         updateCurrentState();
@@ -199,21 +179,13 @@ async function stopTraining() {
         stopButton.disabled = true;
         randomizeButton.disabled = false;
         mapSizeSelect.disabled = false;
-        
-        // Stop polling on error
         stopPolling();
-    } finally {
-        requestInProgress = false;
     }
 }
 
 async function randomizeMap() {
     try {
         console.log("Randomizing map...");
-        
-        if (requestInProgress) return;
-        requestInProgress = true;
-        lastRequestTime = Date.now();
         randomizeButton.disabled = true;
         
         const response = await fetch('/randomize_map', {
@@ -250,15 +222,11 @@ async function randomizeMap() {
         showNotification('Error randomizing map: ' + error.message, true);
     } finally {
         randomizeButton.disabled = false;
-        requestInProgress = false;
     }
 }
 
 async function saveModelState() {
     try {
-        if (requestInProgress) return;
-        requestInProgress = true;
-        lastRequestTime = Date.now();
         saveButton.disabled = true;
         
         const response = await fetch('/save_model', {
@@ -276,15 +244,11 @@ async function saveModelState() {
         showNotification('Error saving model: ' + error.message, true);
     } finally {
         saveButton.disabled = false;
-        requestInProgress = false;
     }
 }
 
 async function loadModelState() {
     try {
-        if (requestInProgress) return;
-        requestInProgress = true;
-        lastRequestTime = Date.now();
         loadButton.disabled = true;
         
         const response = await fetch('/load_model', {
@@ -303,7 +267,6 @@ async function loadModelState() {
         showNotification('Error loading model: ' + error.message, true);
     } finally {
         loadButton.disabled = false;
-        requestInProgress = false;
     }
 }
 
@@ -352,10 +315,6 @@ function updateVisualization(frameData) {
 
 async function updateCurrentState() {
     try {
-        if (requestInProgress) return;
-        requestInProgress = true;
-        lastRequestTime = Date.now();
-        
         const response = await fetch('/get_state');
         if (!response.ok) {
             throw new Error('Failed to get current state');
@@ -370,8 +329,6 @@ async function updateCurrentState() {
     } catch (error) {
         console.error('Error getting current state:', error);
         showNotification('Error getting current state: ' + error.message, true);
-    } finally {
-        requestInProgress = false;
     }
 }
 
@@ -392,15 +349,6 @@ function showNotification(message, isError = false) {
     }, 3000);
 }
 
-// Initialize the page state
-function initializePage() {
-    console.log('Initializing RL training interface');
-    modelStatus.textContent = 'Model Ready';
-    modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
-    stopButton.disabled = true;
-    updateCurrentState();
-}
-
 // Event Listeners
 startButton.addEventListener('click', startTraining);
 stopButton.addEventListener('click', stopTraining);
@@ -409,17 +357,20 @@ loadButton.addEventListener('click', loadModelState);
 randomizeButton.addEventListener('click', randomizeMap);
 mapSizeSelect.addEventListener('change', randomizeMap);
 
+// Initialize
+stopButton.disabled = true;
+console.log('Initializing RL training interface (REST API version)');
+modelStatus.textContent = 'REST API Ready';
+modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+updateCurrentState();
+
 // Handle page visibility changes
 document.addEventListener('visibilitychange', () => {
     if (document.hidden && isTraining) {
-        console.log('Page hidden, stopping polling but keeping training active');
-        stopPolling();
+        console.log('Page hidden, stopping training');
+        stopTraining();
     } else if (!document.hidden) {
         console.log('Page visible, updating state');
-        if (isTraining) {
-            console.log('Resuming polling');
-            startPolling();
-        }
         updateCurrentState();
     }
 });
@@ -430,9 +381,5 @@ window.addEventListener('beforeunload', () => {
         console.log('Page unloading, stopping training');
         navigator.sendBeacon('/stop_training', '{}');
         isTraining = false;
-        stopPolling();
     }
 });
-
-// Initialize the page
-initializePage();

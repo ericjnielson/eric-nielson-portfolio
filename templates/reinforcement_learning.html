@@ -174,6 +174,27 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="/static/lake.js"></script>
+    <script src="/static/lake-rest.js"></script>
+    <script>
+        // Check for WebSocket support and dynamically load the appropriate script
+        if (window.location.protocol === 'https:' && window.location.hostname.includes('cloud')) {
+            // For cloud environments, use the REST-based approach
+            console.log('Cloud environment detected, using REST API');
+            const script = document.createElement('script');
+            script.src = '/static/lake-rest.js';
+            document.body.appendChild(script);
+        } else {
+            // For local development or environments that support WebSockets, use the Socket.IO approach
+            console.log('Using WebSocket approach');
+            const socketScript = document.createElement('script');
+            socketScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js';
+            socketScript.onload = function() {
+                const lakeScript = document.createElement('script');
+                lakeScript.src = '/static/lake.js';
+                document.body.appendChild(lakeScript);
+            };
+            document.body.appendChild(socketScript);
+        }
+    </script>
 </body>
 </html>
