@@ -1,27 +1,17 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio</title>
-    <!-- Try url_for first, fallback to direct path -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" onerror="this.onerror=null;this.href='/static/styles.css';">
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-C7M0GTCBJX"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-C7M0GTCBJX');
-</script>
 <body>
+
+
     <div class="profile-info">
-        <!-- Use fallback pattern for images too -->
-        <img src="{{ url_for('static', filename='Headshot.PNG') }}" alt="Eric Nielson" onerror="this.onerror=null;this.src='/static/Headshot.PNG';">
+        <img src="/static/Headshot.PNG" alt="Eric Nielson">
         <h1>Eric Nielson, EdD, MBA</h1>
-        <p>Senior Product Manager | Captain</p>
+        <p>Senior Product Manager | Major</p>
     </div>
 
     <div class="highlights-section">
@@ -29,32 +19,32 @@
         <div class="highlights-grid">
             <div class="highlight-card">
                 <div class="highlight-icon">🚀</div>
-                <h3>Product Management</h3>
-                <p>Scaled growth and adoption at ESPN and Amazon, launched 3 products and major features from 0 to 1 at Komodo, generated $670M+ in revenue across the 3 companies.</p>
+                <h3>Product Innovation</h3>
+                <p>Launched and scaled 0→1 and 1→100 consumer and data products at Komodo, Amazon, and Disney. Achieved $500M+ revenue impact and 85% reduction in time-to-insight using AI/LLM features.</p>
             </div>
             
             <div class="highlight-card">
                 <div class="highlight-icon">🎓</div>
                 <h3>Education</h3>
-                <p>Doctor of Education from USC, MBA from LSU. Expert in Psychological Safety and the development of teams that drive towards organizational goals.</p>
+                <p>Doctor of Education from USC, MBA from LSU. Specialized in psychological safety, leadership, and applied organizational psychology.</p>
             </div>
     
             <div class="highlight-card">
                 <div class="highlight-icon">⭐</div>
                 <h3>Military Leadership</h3>
-                <p>Air Force Captain, leading the operations and training for Aeromedical Evacuation. Continually rated top 5% of Officers.</p>
+                <p>Air Force Major, leading 60+ personnel and $500M in resources. Recognized with the Army Commendation Medal and ranked top 2 of 54 Captains for operational excellence during Middle East deployment.</p>
             </div>
     
             <div class="highlight-card">
                 <div class="highlight-icon">🎯</div>
                 <h3>Teaching Impact</h3>
-                <p>Adjunct Professor teaching University of Arizona MBA students on the best practices in Project and Operations Management, Leadership, and Human Capital Management through Applied Psychology.</p>
+                <p>Adjunct Professor at University of Arizona MBA program. Courses taught include Operations, Leadership, and Human Capital Strategy using Applied Psychology.</p>
             </div>
     
             <div class="highlight-card">
                 <div class="highlight-icon">🔧</div>
                 <h3>Technical Skills</h3>
-                <p>Machine learning and AI engineering fundamentals, data analytics, and product development expertise.</p>
+                <p>LLMs (Langgraph, Prompt Engineering), Python, SQL, Tableau, Figma, Amplitude, A/B Testing, Product Discovery, Snowflake, GraphQL.</p>
             </div>
         </div>
     </div>
@@ -63,43 +53,43 @@
         <h1>Work Examples</h1>
 
         <div class="portfolio-item">
-            <img src="{{ url_for('static', filename='maplab.png') }}" alt="MapLab">
+            <img src="/static/maplab.png" alt="MapLab">
             <div class="portfolio-item-content">
                 <h3>MapLab</h3>
-                <p>A unified healthcare software suite powered by the Komodo Healthcare Map to scale insight generation, decision-making, and the product life cycle.</p>
-                <a href="{{ url_for('maplab') }}">View</a>
+                <p>A unified healthcare software suite powered by the Komodo Healthcare Map to scale insight generation, decision-making, and the product life cycle</p>
+                <a href="/maplab">View</a>
             </div>
         </div>
 
         <div class="portfolio-item">
-            <img src="{{ url_for('static', filename='voc.jpg') }}" alt="VOC">
+            <img src="/static/voc.jpg" alt="VOC">
             <div class="portfolio-item-content">
                 <h3>Voice of the Customer Program</h3>
                 <p>Established company-wide VOC program, synthesizing 300+ data points to drive 50+ feature enhancements.</p>
-                <a href="{{ url_for('voc') }}" target="_blank">View</a>
+                <a href="/voc" target="_blank">View</a>
             </div>
         </div>
 
         <div class="portfolio-item">
-            <img src="{{ url_for('static', filename='peas.jpg') }}" alt="PEAS">
+            <img src="/static/peas.jpg" alt="PEAS">
             <div class="portfolio-item-content">
                 <h3>Amazon High Traffic Events</h3>
                 <p>Led global advertising across Prime Day, Black Friday/Cyber Monday, and Prime Early Access Sale events.</p>
-                <a href="{{ url_for('peas') }}" target="_blank">View</a>
+                <a href="/peas" target="_blank">View</a>
             </div>
         </div>
 
         <div class="portfolio-item">
-            <img src="{{ url_for('static', filename='liveconnect.jpg') }}" alt="LiveConnect">
+            <img src="/static/liveconnect.jpg" alt="LiveConnect">
             <div class="portfolio-item-content">
                 <h3>ESPN's LiveConnect</h3>
                 <p>Developed emotion-based advertising product leveraging real-time sports data and fan engagement.</p>
-                <a href="{{ url_for('liveconnect') }}" target="_blank">View</a>
+                <a href="/Liveconnect" target="_blank">View</a>
             </div>
         </div>
 
         <div class="portfolio-item">
-            <img src="{{ url_for('static', filename='dissertation.jpg') }}" alt="Dissertation">
+            <img src="/static/dissertation.jpg" alt="Dissertation">
             <div class="portfolio-item-content">
                 <h3>Doctoral Dissertation</h3>
                 <p>Investigating the role of psychological safety in military officer candidates.</p>
@@ -112,25 +102,25 @@
         <h1>Personal Projects</h1>
         
         <div class="portfolio-item" data-project="logo">
-            <img src="{{ url_for('static', filename='football.jpg') }}" alt="College Football Prediction Model">
+            <img src="/static/football.jpg" alt="College Football Prediction Model">
             <div class="portfolio-item-content">
                 <h3>College Football Prediction Model</h3>
                 <p>A machine learning model to predict college football scores and spreads using historical data and advanced analytics.</p>
-                <a href="{{ url_for('predictions') }}" target="_blank" rel="noopener noreferrer">View</a>
+                <a href="/cfbpredictions" target="_blank" rel="noopener noreferrer">View</a>
             </div>
         </div>
     
         <div class="portfolio-item" data-project="logo">
-            <img src="{{ url_for('static', filename='uagc.jpg') }}" alt="Teaching Assistant Agent">
+            <img src="/static/uagc.jpg" alt="Teaching Assistant Agent">
             <div class="portfolio-item-content">
                 <h3>MBA Teaching Assistant</h3>
                 <p>An AI Teaching Assistant that provides detailed feedback and evaluation for student discussion posts using natural language processing.</p>
-                <a href="{{ url_for('teaching_assistant') }}" target="_blank" rel="noopener noreferrer">View</a>
+                <a href="/teaching_assistant" target="_blank" rel="noopener noreferrer">View</a>
             </div>
         </div>
     
         <div class="portfolio-item">
-            <img src="{{ url_for('static', filename='palette.jpg') }}" alt="Color Generator">
+            <img src="/static/palette.jpg" alt="Color Generator">
             <div class="portfolio-item-content">
                 <h3>AI-Powered Color Palette Generator</h3>
                 <p>Change this site's background with a prompt using zero-shot AI Engineering. Enter a description or theme to generate a custom color palette.</p>
@@ -142,26 +132,27 @@
         </div>
     
         <div class="portfolio-item" data-project="logo">
-            <img src="{{ url_for('static', filename='planning.jpg') }}" alt="Product Planning">
+            <img src="/static/planning.jpg" alt="Product Planning">
             <div class="portfolio-item-content">
                 <h3>Feature ROI Forecasting</h3>
-                <p>My take on product planning and strategy activities and how organizations can improve those.</p>
-                <a href="{{ url_for('forecasting') }}" target="_blank" rel="noopener noreferrer">View</a>
+                <p>My take on product planning and strategy activities and how organizations can improve those</p>
+                <a href="/forecasting" target="_blank" rel="noopener noreferrer">View</a>
             </div>
         </div>
     
         <div class="portfolio-item" data-project="logo">
-            <img src="{{ url_for('static', filename='lake.jpg') }}" alt="Reinforcement Learning">
+            <img src="/static/lake.jpg" alt="Reinforcement Learning">
             <div class="portfolio-item-content">
                 <h3>Reinforcement Learning</h3>
                 <p>An exploration of reinforcement learning algorithms and applications in decision-making systems.</p>
-                <a href="{{ url_for('rl') }}" target="_blank" rel="noopener noreferrer">View</a>
+                <a href="/reinforcement_learning" target="_blank" rel="noopener noreferrer">View</a>
             </div>
         </div>
     </div>
 
     <div id="toastContainer" class="toast-container"></div>
     
+
     <div class="portfolio">
         <h1>Career Timeline</h1>
     </div>
@@ -171,7 +162,6 @@
             <span>July 2024 – Present</span>
             <p>Part-time Professor having taught Project and Operations Management to over 100 MBA students.</p>
             <p>Qualified to teach Leadership, Project and Operations Management, and Human Capital Management Using Applied Psychology.</p>
-            <a href="{{ url_for('teaching_feedback') }}">Student Evaluations</a>
         </div>
         <div class="timeline-item">
             <h3>Doctor of Education (EdD), University of Southern California</h3>
@@ -180,104 +170,62 @@
         <div class="timeline-item">
             <h3>Senior Product Manager, Komodo Healthcare</h3>
             <span>Mar 2023 – Present</span>
-            <p>Launched a self-service analytics product designed to reduce Data Scientist workflow and time-to-insight, generating over $XM in revenue within its first quarter.</p>
-            <p>Led the development of next-generation healthcare analytics tools, achieving $XM in total revenue in the first year.</p>
-            <p>Established a company Voice of the Customer program, synthesizing 300+ data points to drive 50+ feature and capability enhancements.</p>
+            <p>Launched a high-code IDE and AI-powered analytics platform generating $45M+ in first-year revenue and improving win rates by 15% with over 80% retention.</p>
+            <p>Integrated LLMs and AI into UI/UX, including a research plan creator, guided SQL writing, and automated dashboarding—raising NPS from 22 to 30+.</p>
+            <p>Built a company-wide Voice of the Customer program, synthesizing 450+ data points and enabling 3 strategic investments through early validation.</p>
+            <p>Released a data marketplace that reduced data acquisition from 2 weeks to under 20 minutes, eliminating ops friction and boosting adoption.</p>
         </div>
         <div class="timeline-item">
-            <h3>Captain, 139th Aeromedical Evacuation Squadron</h3>
+            <h3>Major, 139th Aeromedical Evacuation Squadron</h3>
             <span>Jan 2012 – Present</span>
-            <p>Directed operations and supervision for 50+ personnel and managed a $500K budget, increasing training efficiency by 24%, earning an Outstanding squadron unit inspection rating.</p>
-            <p>Spearheaded a $23M Arctic patient movement initiative, developing a new training program and enhancing mission capabilities across the Department of Defense, earning a pacing unit designation.</p>
-            <p>Led a 5-person team to train over 10,000 soldiers in aeromedical evacuation during a Middle East deployment, achieving a 100% patient survival rate and ranking #2 among 54 Captains.</p>
-            <p>Commanded 72 soldiers during COVID-19 response operations, providing critical oversight and support to 70+ New York City hospitals, earning the Army Commendation Medal.</p>
+            <p>Deputy Director of Operations for 60+ personnel, managing a $500M budget and training systems to maintain global medical readiness.</p>
+            <p>Planned multinational exercises across 20 countries, enhancing diplomatic relations and executing 150+ missions with allied forces.</p>
+            <p>Trained over 10,000 soldiers during deployment, achieving a 100% patient survival rate and earning top performance ranking.</p>
+            <p>Led 72 soldiers during COVID-19 response across NYC hospitals; awarded the Army Commendation Medal for operational excellence.</p>
         </div>
         <div class="timeline-item">
             <h3>Senior Product Manager, Amazon</h3>
             <span>Jan 2022 – Dec 2022</span>
-            <p>Managed global advertising for a marquee Amazon event, overseeing 10+ workstreams across 14 countries to deliver $42.9M in ad revenue in two days.</p>
-            <p>Automated all Prime Day and Black Friday creative advertising products, reducing operational workloads by 90%.</p>
-            <p>Scaled product growth and activation to seven additional countries, increasing global reach and revenue by 17%.</p>
-            <p>Launched over 3,000 ad campaigns, reducing product errors by 85% and driving $500M+ in revenue.</p>
+            <p>Automated and scaled ad delivery for Prime Day and BFCM, reaching 1B+ users/day, reducing workload by 90%, and errors by 80%.</p>
+            <p>Led cross-functional global campaign execution across 14 countries and 120 campaigns, driving $42.9M in revenue in two days.</p>
+            <p>Expanded product suite to 7 more countries, increasing global reach by 17% and unlocking 400M new users.</p>
         </div>
-
         <div class="timeline-item">
             <h3>Product Manager, The Walt Disney Company</h3>
             <span>Nov 2019 – Jan 2022</span>
-            <p>Designed and delivered custom API integrations across 20 strategic partnerships, resulting in $10M+ in revenue.</p>
-            <p>Built executive dashboards to consolidate enterprise-wide insights, supporting holistic and strategic decision-making.</p>
-            <p>Managed and mentored a Junior Product Manager, fostering career growth and amplifying team impact.</p>
+            <p>Built and launched 20+ API integrations across Disney’s partner ecosystem, adding $10M+ in new revenue and scaling to 200M+ users.</p>
+            <p>Designed KPI scorecards for executive insights and coached junior PM to improve team velocity and culture.</p>
         </div>
-
         <div class="timeline-item">
             <h3>Associate Manager, ESPN</h3>
             <span>Apr 2018 – Nov 2019</span>
-            <p>Directed 81 integrated advertising campaigns across digital and linear media, driving $134M in revenue.</p>
-            <p>Improved client proposal success rates by 19% through data-driven business insights and analysis.</p>
-            <p>Led creative strategy and project execution from pre- to post-sale, achieving a 37% year-over-year sales increase.</p>
-            <a href = "https://vimeo.com/318534047"> Example 1</a>
-            <a href = "https://vimeo.com/349361945">Example 2</a>
-            <a href = "https://vimeo.com/367154574">Example 3</a>
-            <a href = "https://vimeo.com/291014784">Example 4</a>
-            <a href = "https://vimeo.com/379913304">Example 5</a>
-            <a href = "https://dzfx.tv/espn-mnf-campbells">Example 6</a>
+            <p>Directed 80+ integrated ad campaigns across digital and TV, driving $134M in revenue and 37% YoY sales growth.</p>
+            <p>Led cross-platform campaign innovation and improved creative strategies through customer data insights.</p>
         </div>
-
-        <div class="timeline-item">
-            <h3>Digital Marketing Data Coordinator, ESPN</h3>
-            <span>June 2017 - Apr 2018</span>
-            <p>Led and implemented growth of a $5.3M product designed for personalized advertising campaigns across all ESPN platforms.</p>
-            <p>Eliminated 5 separate customer journey pain-points and time to activation by 40% leading to product and marketing efficiencies.</p>
-            <p>Trained a 58-person team for go-to-market activities on use and management of a product leading to 100% product adoption.</p>
-        </div>
-
         <div class="timeline-item">
             <h3>Master of Business Administration (MBA), Louisiana State University</h3>
             <span>May 2017</span>
         </div>
-
         <div class="timeline-item">
             <h3>Bachelor of Arts, Communication, University of Wyoming</h3>
             <span>May 2015</span>
         </div>
     </div>
+
     <div class="connect-section">
         <h2>Connect With Me</h2>
         <div class="social-buttons">
+            <a href="/static/Eric_Nielson_SrProductManager_Website.docx" class="social-icon" download>
+                <img src="/static/resume.png" alt="Download Resume" title="Download Resume">
+            </a>
             <a href="https://www.linkedin.com/in/ericjnielson/" class="social-icon" target="_blank">
-                <img src="{{ url_for('static', filename='linkedin.png') }}" alt="LinkedIn" title="Connect on LinkedIn">
+                <img src="/static/linkedin.png" alt="LinkedIn" title="Connect on LinkedIn">
             </a>
             <a href="mailto:ericjnielson2@gmail.com" class="social-icon">
-                <img src="{{ url_for('static', filename='gmail.png') }}" alt="Gmail" title="Email Me">
-            </a>
-            <a href="https://github.com/ericjnielson/eric-nielson-portfolio" class="social-icon" target="_blank">
-                <img src="{{ url_for('static', filename='github.png') }}" alt="Github" title="Github">
+                <img src="/static/gmail.png" alt="Gmail" title="Email Me">
             </a>
         </div>
     </div>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
-    <script type="module">
-        // Import the functions you need from the SDKs you need
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-analytics.js";
-        // TODO: Add SDKs for Firebase products that you want to use
-        // https://firebase.google.com/docs/web/setup#available-libraries
-      
-        // Your web app's Firebase configuration
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-        const firebaseConfig = {
-          apiKey: "AIzaSyAEYwmBaDh0I7G8IZH5qnYapY3IFUtJ92g",
-          authDomain: "robotic-branch-452315-m3.firebaseapp.com",
-          projectId: "robotic-branch-452315-m3",
-          storageBucket: "robotic-branch-452315-m3.firebasestorage.app",
-          messagingSenderId: "1048043412760",
-          appId: "1:1048043412760:web:90d1757a90bf723ce2d26d",
-          measurementId: "G-C7M0GTCBJX"
-        };
-      
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-      </script>
+    <script src="/static/script.js"></script>
 </body>
 </html>
