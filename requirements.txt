@@ -1,10 +1,4 @@
-# Dev environment
-pip
-autopep8
-
-# App
 eventlet
-anthropic
 opencv-python
 numpy
 python-dotenv
@@ -13,8 +7,6 @@ flask
 flask-cors
 flask-socketio
 gymnasium
-gymnasium[toy-text]  
-pygame  
 opencv-python
 numpy
 scipy
@@ -22,8 +14,10 @@ scikit-learn
 pandas
 joblib
 requests
-pillow
+pandas
 xgboost
 gql
 aiohttp
 seaborn
+setuptools>=68.0.0
+wheel>=0.41.0
