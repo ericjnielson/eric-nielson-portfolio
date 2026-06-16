@@ -3,8 +3,11 @@ let isTraining = false;
 let requestInProgress = false;
 let lastRequestTime = 0;
 let pollingInterval = null;
+let trainingTimeout = null;          // handle for the next scheduled training step
+let loopActive = false;              // whether the client-driven loop should keep running
 const POLLING_INTERVAL_MS = 1000; // Poll every second
 const MIN_REQUEST_INTERVAL_MS = 500; // Minimum time between requests
+const STEP_DELAY_MS = 40;            // delay between episodes (~25 eps/sec cap; smooth)
 
 // DOM Elements
 const startButton = document.getElementById('startTraining');
@@ -49,82 +52,32 @@ function canMakeRequest() {
     return !requestInProgress && (now - lastRequestTime) > MIN_REQUEST_INTERVAL_MS;
 }
 
-// Function to start polling for updates
-function startPolling() {
-    if (pollingInterval) {
-        clearInterval(pollingInterval);
-    }
-    
-    pollingInterval = setInterval(async () => {
-        if (isTraining && canMakeRequest()) {
-            try {
-                requestInProgress = true;
-                lastRequestTime = Date.now();
-                
-                const response = await fetch('/get_state', {
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                        'Pragma': 'no-cache'
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    // Handle training data update
-                    if (data.metrics) {
-                        updateMetrics(data.metrics);
-                        
-                        // Check if training is complete
-                        if (data.metrics.training_complete) {
-                            console.log('Training complete (from polling)');
-                            stopPolling();
-                            stopTraining();
-                            showNotification('Training complete! ' + 
-                                `Success rate: ${data.metrics.success_rate.toFixed(1)}%, ` +
-                                `Episodes: ${data.metrics.episode_count}`);
-                        }
-                    }
-                    
-                    if (data.frame) {
-                        updateVisualization(data.frame);
-                    }
-                }
-                
-            } catch (error) {
-                console.error('Error during polling:', error);
-            } finally {
-                requestInProgress = false;
-            }
-        }
-    }, POLLING_INTERVAL_MS);
-    
-    console.log('Started polling for training updates');
+// Clear any scheduled work (next training step or a legacy poll interval).
+function stopScheduled() {
+    if (trainingTimeout) { clearTimeout(trainingTimeout); trainingTimeout = null; }
+    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
 }
 
-// Function to stop polling
-function stopPolling() {
-    if (pollingInterval) {
-        clearInterval(pollingInterval);
-        pollingInterval = null;
-        console.log('Stopped polling for training updates');
-    }
-}
+// Client-driven training loop: run one episode per /train_step call and render
+// its frame, then schedule the next. This gives a smooth, 1:1 stream of frames
+// (every episode is shown) and keeps Cloud Run's CPU allocated while it works,
+// instead of running a server thread we only sampled once a second.
+async function runTrainingLoop() {
+    if (!loopActive || !isTraining) return;
 
-// Training control functions
-async function startTraining() {
+    // If another request (e.g. randomize) is mid-flight, retry shortly.
+    if (requestInProgress) {
+        trainingTimeout = setTimeout(runTrainingLoop, STEP_DELAY_MS);
+        return;
+    }
+
     try {
-        console.log("Starting training...");
-        
-        if (requestInProgress) return;
         requestInProgress = true;
         lastRequestTime = Date.now();
-        
-        const response = await fetch('/start_training', {
+
+        const response = await fetch('/train_step', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 learning_rate: parseFloat(learningRateSlider.value),
                 discount_factor: parseFloat(discountFactorSlider.value),
@@ -133,78 +86,90 @@ async function startTraining() {
         });
 
         const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to start training');
-        }
+        if (!response.ok) throw new Error(data.error || 'Training step failed');
 
-        isTraining = true;
-        startButton.disabled = true;
-        stopButton.disabled = false;
-        randomizeButton.disabled = true;
-        mapSizeSelect.disabled = true;
-        modelStatus.textContent = 'Training';
-        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
-        
-        // Start polling for updates
-        startPolling();
+        if (data.metrics) {
+            updateMetrics(data.metrics);
+            if (data.metrics.training_complete) {
+                requestInProgress = false;
+                showNotification('Training complete! ' +
+                    `Success rate: ${(data.metrics.success_rate || 0).toFixed(1)}%, ` +
+                    `Episodes: ${data.metrics.episode_count}`);
+                stopTraining();
+                return;
+            }
+        }
+        if (data.frame) updateVisualization(data.frame);
 
     } catch (error) {
-        console.error("Start training error:", error);
-        showNotification('Error starting training: ' + error.message, true);
-    } finally {
+        console.error('Error during training step:', error);
         requestInProgress = false;
+        showNotification('Error during training: ' + error.message, true);
+        stopTraining();
+        return;
+    }
+
+    requestInProgress = false;
+    if (loopActive && isTraining) {
+        trainingTimeout = setTimeout(runTrainingLoop, STEP_DELAY_MS);
     }
 }
 
+// Start/stop the loop. Named startPolling/stopPolling so existing callers
+// (visibility/unload handlers) keep working.
+function startPolling() {
+    loopActive = true;
+    stopScheduled();
+    runTrainingLoop();
+    console.log('Started client-driven training loop');
+}
+
+function stopPolling() {
+    loopActive = false;
+    stopScheduled();
+    console.log('Stopped client-driven training loop');
+}
+
+// Training control functions
+function startTraining() {
+    if (isTraining) return;
+    console.log("Starting training...");
+
+    isTraining = true;
+    startButton.disabled = true;
+    stopButton.disabled = false;
+    randomizeButton.disabled = true;
+    mapSizeSelect.disabled = true;
+    modelStatus.textContent = 'Training';
+    modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800';
+
+    // The client drives episodes directly via /train_step for a smooth 1:1 stream.
+    startPolling();
+}
+
 async function stopTraining() {
+    console.log("Stopping training...");
+
+    // Stop the loop first so it can't reschedule itself.
+    isTraining = false;
+    stopPolling();
+
+    startButton.disabled = false;
+    stopButton.disabled = true;
+    randomizeButton.disabled = false;
+    mapSizeSelect.disabled = false;
+    modelStatus.textContent = 'Model Ready';
+    modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+
+    // Best-effort: clear any legacy server-side training flag (no-op in client-driven mode).
     try {
-        console.log("Stopping training...");
-        
-        if (requestInProgress) return;
-        requestInProgress = true;
-        lastRequestTime = Date.now();
-        
-        const response = await fetch('/stop_training', {
-            method: 'POST'
-        });
-
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to stop training');
-        }
-
-        isTraining = false;
-        startButton.disabled = false;
-        stopButton.disabled = true;
-        randomizeButton.disabled = false;
-        mapSizeSelect.disabled = false;
-        modelStatus.textContent = 'Model Ready';
-        modelStatus.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
-        
-        // Stop polling
-        stopPolling();
-
-        // Get final state update
-        updateCurrentState();
-
+        await fetch('/stop_training', { method: 'POST' });
     } catch (error) {
-        console.error("Stop training error:", error);
-        showNotification('Error stopping training: ' + error.message, true);
-        
-        // Reset UI even on error to allow restart
-        isTraining = false;
-        startButton.disabled = false;
-        stopButton.disabled = true;
-        randomizeButton.disabled = false;
-        mapSizeSelect.disabled = false;
-        
-        // Stop polling on error
-        stopPolling();
-    } finally {
-        requestInProgress = false;
+        console.warn('stop_training notify failed:', error);
     }
+
+    // Refresh the final frame/metrics.
+    updateCurrentState();
 }
 
 async function randomizeMap() {
