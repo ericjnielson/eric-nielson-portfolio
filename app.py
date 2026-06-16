@@ -24,7 +24,7 @@ from lake import FrozenLake
 from training_manager import TrainingManager
 from teaching_assistant import ProjectManagementTA
 from forecasting import RevenueForecast
-from models.predictor import model_info, predict_score, games_df
+from models.predictor import predict_score, get_games_df, get_model_metrics
 
 def is_port_in_use(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -319,6 +319,7 @@ class PortfolioApp:
     # CFB Predictor handlers
     def get_teams(self):
         try:
+            games_df = get_games_df()
             teams = []
             for _, row in games_df.drop_duplicates(['homeTeam', 'home_conference']).iterrows():
                 teams.append(f"{row['home_conference']} - {row['homeTeam']}")
@@ -334,43 +335,44 @@ class PortfolioApp:
 
             home_team = data['homeTeam'].split(' - ')[-1]
             away_team = data['awayTeam'].split(' - ')[-1]
-            
-            available_home_teams = games_df['homeTeam'].unique()
-            available_away_teams = games_df['awayTeam'].unique()
-            
-            if home_team not in available_home_teams:
-                return jsonify({"error": f"Invalid home team: {home_team}"}), 400
-            if away_team not in available_away_teams:
-                return jsonify({"error": f"Invalid away team: {away_team}"}), 400
 
-            prediction = predict_score(home_team, away_team, games_df, 2024)
-            
-            if prediction:
-                response_data = {
-                    'homeTeam': {
-                        'name': home_team,
-                        'predictedScore': prediction['scores']['home']['score'],
-                        'avgPoints': prediction['scores']['home']['stats']['avg_score'],
-                        'winPercentage': None
-                    },
-                    'awayTeam': {
-                        'name': away_team,
-                        'predictedScore': prediction['scores']['away']['score'],
-                        'avgPoints': prediction['scores']['away']['stats']['avg_score'],
-                        'winPercentage': None
-                    },
-                    'prediction': {
-                        'spread': prediction['prediction']['spread'],
-                        'total': prediction['prediction']['total'],
-                        'favorite': prediction['prediction']['favorite'],
-                        'underdog': prediction['prediction']['underdog'],
-                        'factors': prediction['factors'],
-                        'weights': prediction['weights']
-                    }
-                }
-                return jsonify(response_data)
-            else:
-                return jsonify({"error": "Unable to generate prediction"}), 500
+            games_df = get_games_df()
+            prediction = predict_score(home_team, away_team, games_df)
+
+            if prediction.get('error') or not prediction.get('scores'):
+                return jsonify({"error": prediction.get('error',
+                                "Unable to generate prediction")}), 400
+
+            home = prediction['scores']['home']
+            away = prediction['scores']['away']
+            response_data = {
+                'homeTeam': {
+                    'name': home_team,
+                    'predictedScore': home['score'],
+                    'avgPoints': home['stats']['avg_score'],
+                    'scoreRange': [home['stats'].get('score_low'),
+                                   home['stats'].get('score_high')],
+                    'winPercentage': None
+                },
+                'awayTeam': {
+                    'name': away_team,
+                    'predictedScore': away['score'],
+                    'avgPoints': away['stats']['avg_score'],
+                    'scoreRange': [away['stats'].get('score_low'),
+                                   away['stats'].get('score_high')],
+                    'winPercentage': None
+                },
+                'prediction': {
+                    'spread': prediction['prediction']['spread'],
+                    'total': prediction['prediction']['total'],
+                    'favorite': prediction['prediction']['favorite'],
+                    'underdog': prediction['prediction']['underdog'],
+                    'factors': prediction['factors'],
+                    'weights': prediction['weights']
+                },
+                'lowConfidence': prediction.get('low_confidence', False)
+            }
+            return jsonify(response_data)
 
         except Exception as e:
             print("Error in /api/predict:")
@@ -380,14 +382,7 @@ class PortfolioApp:
 
     def get_model_info(self):
         try:
-            return jsonify({
-                'homeModel': {
-                    'metrics': model_info['models']['homePoints']['metrics']
-                },
-                'awayModel': {
-                    'metrics': model_info['models']['awayPoints']['metrics']
-                }
-            })
+            return jsonify(get_model_metrics())
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 

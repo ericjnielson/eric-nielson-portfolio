@@ -40,10 +40,14 @@
 
             <div class="journey-section">
                 <h2>Approach</h2>
-                <p>The solution combines multiple machine learning models trained on historical game data, team 
-                   statistics, seasonal, yearly, strength-of-schedule, and situational factors. Using Python with scikit-learn and pandas, I developed 
-                   a custom ensemble model that weights various factors differently based on their historical 
-                   predictive power. I found the Gradient Boost Regressor model performed better than the Random Forrest and XGBBoost models. When testing with model predicted scores the model comes quite close to the actual games scores. This was easily my most challenging project to date given the difficulty in predicting reasonable results.</p>
+                <p>The model uses gradient-boosted trees (XGBoost) inside a scikit-learn pipeline to predict a game's
+                   margin (home minus away) and total points, from which the two team scores are recovered. Crucially,
+                   it is trained only on information knowable <em>before</em> kickoff — pre-game Elo ratings, rest days,
+                   home field, schedule, and weather — and validated on a true temporal holdout (train on 2008–2010,
+                   test on the unseen 2011 season) so the reported accuracy isn't inflated by data leakage. On unseen
+                   games it identifies the straight-up winner roughly 70% of the time with a margin error of about
+                   14 points, beating both naive-average and Elo-only baselines. (Betting lines were unavailable in this
+                   dataset, so the model is benchmarked against statistical baselines rather than the Vegas spread.)</p>
             </div>
 
             <div class="journey-section">
@@ -56,6 +60,8 @@
                     <h3>Key Learnings</h3>
                     <ul>
                         <li>Data quality and cleanliness predicate any quality model</li>
+                        <li>Look-ahead leakage is the silent killer: features like rolling averages must be lagged (shifted) so a game never "sees" its own outcome, and the train/test split must respect time — otherwise validation scores become fiction</li>
+                        <li>Honest baselines matter: a model is only worth shipping if it beats naive and Elo-only benchmarks on a held-out future season</li>
                         <li>ML models require subject matter experts to review results and help to train those models. Many times the predictions revealed results that did not make sense, such as the away team's venue id being the most important feature</li>
                     </ul>
                 </div>

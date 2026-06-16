@@ -1,532 +1,295 @@
 """
-College Football Score Prediction Module (cleaned & aligned to notebook)
+College Football Score Prediction — inference module.
+
+This module loads a leakage-free, temporally-validated model trained by
+``models/train.py`` and exposes a UI-friendly ``predict_score`` function that
+preserves the JSON contract the Flask app and front-end expect.
+
+Design notes
+------------
+* The model predicts game **margin** (home - away) and **total** (home + away)
+  directly, then recovers the two scores:  home = (total + margin) / 2,
+  away = (total - margin) / 2.  This is easier to calibrate and benchmark than
+  two independent score regressors.
+* Features are restricted to a **pre-game whitelist** (Elo ratings known before
+  kickoff, schedule/rest context, and weather).  The rich rolling/EPA columns in
+  the source CSV were excluded because they were pre-computed *with look-ahead
+  leakage* (no ``shift(1)``) and the raw per-game values needed to recompute them
+  correctly are not present in the processed dataset.
+* Loading is **lazy and cached** — importing this module has no side effects.
 """
 
 from __future__ import annotations
 
 import os
-import warnings
-from typing import Dict, Tuple, Any
+from functools import lru_cache
+from typing import Any, Dict, List, Optional
 
 import joblib
 import numpy as np
 import pandas as pd
 
-warnings.filterwarnings("ignore")
+# =========================================================================
+# Paths / schema
+# =========================================================================
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+SAVE_DIR = os.path.join(CURRENT_DIR, "saved")
+DATA_PATH = os.path.join(CURRENT_DIR, "data", "processed_games.csv")
+MODEL_PATH = os.path.join(SAVE_DIR, "cfb_model.joblib")
 
-# =========================
-# Constants / defaults
-# =========================
-RANDOM_STATE = 42
+SCHEMA_VERSION = 2
 
-# Globals populated by initialize_model()
-games_df: pd.DataFrame | None = None
-model_info: Dict[str, Any] | None = None
-home_encoders: Dict[str, Any] | None = None
+# The ONLY columns the model is allowed to see. Every one of these is knowable
+# before kickoff, so there is no target leakage.
+FEATURES: List[str] = [
+    "home_elo",
+    "away_elo",
+    "elo_diff",
+    "elo_missing",
+    "home_rest_days",
+    "away_rest_days",
+    "rest_advantage",
+    "neutral_site",
+    "conference_game",
+    "week",
+    "temperature",
+    "wind_speed",
+    "humidity",
+    "precipitation",
+]
+
+# Sensible fallbacks used when a column is entirely absent. Real medians are
+# computed at train time and stored in the model bundle (``inference_defaults``).
+_FALLBACK_DEFAULTS: Dict[str, float] = {
+    "home_rest_days": 7.0,
+    "away_rest_days": 7.0,
+    "week": 7.0,
+    "temperature": 65.0,
+    "wind_speed": 6.0,
+    "humidity": 60.0,
+    "precipitation": 0.0,
+    "default_elo": 1500.0,
+}
 
 
-# =========================
-# Utility + preprocessing
-# =========================
-def handle_missing_data(df: pd.DataFrame) -> pd.DataFrame:
+# =========================================================================
+# Feature engineering — single source of truth for train AND inference
+# =========================================================================
+def build_feature_frame(raw: pd.DataFrame) -> pd.DataFrame:
+    """Turn raw game rows into the leakage-free feature matrix.
+
+    Used by both ``train.py`` (on historical games) and inference (on a single
+    synthetic matchup row), guaranteeing identical feature construction.
     """
-    Light missing-data handling aligned with the notebook output.
-    Uses home_/away_ conference names and weather columns if present.
-    """
-    df = df.copy()
+    df = raw.copy()
+    out = pd.DataFrame(index=df.index)
 
-    # Scores
-    for col in ["homePoints", "awayPoints"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-            df[col] = df[col].fillna(df[col].mean())
+    home_elo = pd.to_numeric(df.get("homeStartElo"), errors="coerce")
+    away_elo = pd.to_numeric(df.get("awayStartElo"), errors="coerce")
+    out["home_elo"] = home_elo
+    out["away_elo"] = away_elo
+    out["elo_diff"] = home_elo - away_elo
+    out["elo_missing"] = (home_elo.isna() | away_elo.isna()).astype(int)
 
-    # Conferences
-    for col in ["home_conference", "away_conference"]:
-        if col in df.columns:
-            df[col] = df[col].fillna("Unknown")
+    home_rest = pd.to_numeric(df.get("home_rest_days"), errors="coerce")
+    away_rest = pd.to_numeric(df.get("away_rest_days"), errors="coerce")
+    out["home_rest_days"] = home_rest
+    out["away_rest_days"] = away_rest
+    out["rest_advantage"] = home_rest - away_rest
 
-    # Team metrics (EPA etc.)
-    team_metric_cols = [c for c in df.columns if any(x in c for x in ["epa", "success", "explosiveness"])]
-    for col in team_metric_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-        if "home_conference" in df.columns:
-            df[col] = df.groupby("home_conference")[col].transform(lambda x: x.fillna(x.mean()))
-        df[col] = df[col].fillna(df[col].mean())
+    out["neutral_site"] = _as_int(df.get("neutralSite"))
+    out["conference_game"] = _as_int(df.get("conferenceGame"))
+    out["week"] = pd.to_numeric(df.get("week"), errors="coerce")
 
-    # Weather
-    for col in ["temperature", "humidity", "windSpeed"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-            if set(["season", "week"]).issubset(df.columns):
-                df[col] = df.groupby(["season", "week"])[col].transform(lambda x: x.fillna(x.mean()))
-            df[col] = df[col].fillna(df[col].mean())
+    out["temperature"] = pd.to_numeric(df.get("temperature"), errors="coerce")
+    out["wind_speed"] = pd.to_numeric(df.get("windSpeed"), errors="coerce")
+    out["humidity"] = pd.to_numeric(df.get("humidity"), errors="coerce")
+    out["precipitation"] = pd.to_numeric(df.get("precipitation"), errors="coerce")
 
-    # Ratings (expect legacy unsuffixed or normalized ones to be present from your notebook)
-    for col in ["elo", "fpi", "spOverall", "srs", "home_elo", "away_elo", "home_fpi", "away_fpi"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-            df[col] = df[col].fillna(df[col].mean())
+    return out[FEATURES]
 
-    # Context
-    for col in ["home_rest_days", "away_rest_days", "attendance"]:
-        if col in df.columns:
-            if col != "attendance":
-                df[col] = pd.to_numeric(df[col], errors="coerce")
-            df[col] = df[col].fillna(df[col].median())
 
-    # Create rest_days (difference) if your UI code expects it
-    if {"home_rest_days", "away_rest_days"}.issubset(df.columns) and "rest_days" not in df.columns:
-        df["rest_days"] = df["home_rest_days"] - df["away_rest_days"]
+def compute_targets(raw: pd.DataFrame) -> pd.DataFrame:
+    """Return margin (home-away) and total (home+away) targets."""
+    home = pd.to_numeric(raw["homePoints"], errors="coerce")
+    away = pd.to_numeric(raw["awayPoints"], errors="coerce")
+    return pd.DataFrame({"margin": home - away, "total": home + away})
 
+
+def _as_int(series: Optional[pd.Series]) -> pd.Series:
+    if series is None:
+        return pd.Series(0, dtype=int)
+    return (
+        pd.Series(series).map({True: 1, False: 0, "true": 1, "false": 0})
+        .fillna(pd.to_numeric(series, errors="coerce"))
+        .fillna(0)
+        .astype(int)
+    )
+
+
+# =========================================================================
+# Lazy, cached loaders (no import-time side effects)
+# =========================================================================
+@lru_cache(maxsize=1)
+def get_games_df() -> pd.DataFrame:
+    """Load and lightly clean the historical games used for team lookups."""
+    if not os.path.exists(DATA_PATH):
+        return pd.DataFrame()
+    df = pd.read_csv(DATA_PATH)
+    if "startDate" in df.columns:
+        df["startDate"] = pd.to_datetime(df["startDate"], errors="coerce")
     return df
 
 
-def add_team_performance_context(df: pd.DataFrame) -> pd.DataFrame:
-    """Add simple rolling/context features that don't assume unavailable columns."""
-    if df.empty:
-        return df.copy()
-
-    out = df.copy()
-    for team_type in ["home", "away"]:
-        team_id_col = f"{team_type}TeamId"
-        points_col = f"{team_type}Points"
-        if team_id_col not in out.columns or points_col not in out.columns:
-            continue
-
-        out[points_col] = pd.to_numeric(out[points_col], errors="coerce")
-
-        # Expanding mean of scoring
-        out[f"{team_type}_historical_scoring"] = (
-            out.groupby(team_id_col)[points_col].transform(lambda x: x.expanding().mean())
+@lru_cache(maxsize=1)
+def get_model_bundle() -> Optional[Dict[str, Any]]:
+    """Load the trained model bundle (or ``None`` if it has not been built)."""
+    if not os.path.exists(MODEL_PATH):
+        print(
+            f"[predictor] No model found at {MODEL_PATH}. "
+            "Run `python models/train.py` to build it."
         )
-
-        # Last 3/5 game rolling mean
-        for window in [3, 5]:
-            out[f"{team_type}_last{window}_avg"] = out.groupby(team_id_col)[points_col].transform(
-                lambda x: x.rolling(window, min_periods=1).mean()
-            )
-
-        # Season avg/std
-        if "season" in out.columns:
-            out[f"{team_type}_season_avg"] = out.groupby([team_id_col, "season"])[points_col].transform("mean")
-            out[f"{team_type}_season_std"] = out.groupby([team_id_col, "season"])[points_col].transform("std")
-
-        # Win/loss indicator
-        opp = "away" if team_type == "home" else "home"
-        opp_points = f"{opp}Points"
-        if opp_points in out.columns:
-            out[f"{team_type}_won"] = (out[points_col] > out[opp_points]).astype(int)
-
-        # Conference win %
-        conf_col = f"{team_type}_conference"
-        if conf_col in out.columns and f"{team_type}_won" in out.columns and "season" in out.columns:
-            out[f"{team_type}_conf_win_pct"] = out.groupby(["season", conf_col])[f"{team_type}_won"].transform("mean")
-
-    return out
+        return None
+    return joblib.load(MODEL_PATH)
 
 
-def add_enhanced_timing_features(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    if "startDate" in out.columns:
-        out["startDate"] = pd.to_datetime(out["startDate"], errors="coerce")
-
-    if {"season", "homeTeamId", "week"}.issubset(out.columns):
-        out["games_into_season"] = out.groupby(["season", "homeTeamId"]).cumcount()
-        max_week = out.groupby("season")["week"].transform("max")
-        out["games_remaining"] = max_week - out["week"]
-        out["season_progress"] = out["week"] / max_week.replace(0, np.nan)
-
-    # rest_days created in handle_missing_data
-    if {"home_rest_days", "away_rest_days"}.issubset(out.columns):
-        out["rest_advantage"] = out["home_rest_days"] - out["away_rest_days"]
-        out["total_rest"] = out["home_rest_days"] + out["away_rest_days"]
-        out["home_short_rest"] = (out["home_rest_days"] < 6).astype(int)
-        out["away_short_rest"] = (out["away_rest_days"] < 6).astype(int)
-        out["home_long_rest"] = (out["home_rest_days"] > 8).astype(int)
-        out["away_long_rest"] = (out["away_rest_days"] > 8).astype(int)
-
-    # excitement-based flags if available
-    if "excitement" in out.columns and {"homeTeamId", "awayTeamId"}.issubset(out.columns):
-        grp = out.groupby(["homeTeamId", "awayTeamId"])["excitement"]
-        thresh = grp.transform(lambda x: x.mean() + x.std())
-        out["rivalry_game"] = (out["excitement"] > thresh).astype(int)
-        out["big_game"] = out["excitement"] > out["excitement"].quantile(0.75)
-
-    return out
-
-
-def add_enhanced_momentum_features(df: pd.DataFrame) -> pd.DataFrame:
+@lru_cache(maxsize=1)
+def _team_elo_state() -> Dict[str, float]:
+    """Most recent pre-game Elo for each team, for as-of inference."""
+    df = get_games_df()
     if df.empty:
-        return df.copy()
+        return {}
 
-    out = df.sort_values(["startDate", "homeTeamId"]).copy()
-    for team_type in ["home", "away"]:
-        points_col = f"{team_type}Points"
-        team_id_col = f"{team_type}TeamId"
-        opp = "away" if team_type == "home" else "home"
+    rows = []
+    if {"homeTeam", "homeStartElo"}.issubset(df.columns):
+        rows.append(df[["homeTeam", "homeStartElo", "startDate"]].rename(
+            columns={"homeTeam": "team", "homeStartElo": "elo"}))
+    if {"awayTeam", "awayStartElo"}.issubset(df.columns):
+        rows.append(df[["awayTeam", "awayStartElo", "startDate"]].rename(
+            columns={"awayTeam": "team", "awayStartElo": "elo"}))
+    if not rows:
+        return {}
 
-        if not {points_col, team_id_col, f"{opp}Points"}.issubset(out.columns):
-            continue
-
-        out[points_col] = pd.to_numeric(out[points_col], errors="coerce")
-        out[f"{opp}Points"] = pd.to_numeric(out[f"{opp}Points"], errors="coerce")
-
-        # Short/long-term scoring
-        for window in [3, 6]:
-            out[f"{team_type}_points_last{window}"] = out.groupby([team_id_col, "season"])[points_col].transform(
-                lambda x: x.rolling(window, min_periods=1).mean()
-            )
-
-        out[f"{team_type}_points_momentum"] = (
-            out.get(f"{team_type}_points_last3", 0) - out.get(f"{team_type}_points_last6", 0)
-        )
-
-        out[f"{team_type}_won"] = (out[points_col] > out[f"{opp}Points"]).astype(int)
-        out[f"{team_type}_point_diff"] = out[points_col] - out[f"{opp}Points"]
-
-        # scoring efficiency (vs season mean)
-        season_mean = out.groupby([team_id_col, "season"])[points_col].transform("mean")
-        out[f"{team_type}_scoring_efficiency"] = out[points_col] / season_mean.replace(0, np.nan)
-
-        out[f"{team_type}_in_form"] = (out[f"{team_type}_points_momentum"] > 0).astype(int)
-
-    return out
+    long = pd.concat(rows, ignore_index=True).dropna(subset=["team", "elo"])
+    if "startDate" in long.columns:
+        long = long.sort_values("startDate")
+    latest = long.groupby("team")["elo"].last()
+    return latest.to_dict()
 
 
-def add_enhanced_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Master feature engineering without undefined dependencies.
-    (Removed add_sos_features / add_interaction_features which were undefined.)
-    """
-    enhanced = handle_missing_data(df)
-    enhanced = add_team_performance_context(enhanced)
-    enhanced = add_enhanced_timing_features(enhanced)
-    enhanced = add_enhanced_momentum_features(enhanced)
-
-    # Season period bucket by week if available
-    if "week" in enhanced.columns and len(enhanced) > 0:
-        try:
-            enhanced["season_period"] = pd.qcut(enhanced["week"], q=3, labels=["Early", "Mid", "Late"])
-        except Exception:
-            enhanced["season_period"] = "Mid"
-
-    # Expected scoring
-    if "overUnder" in enhanced.columns:
-        enhanced["expected_scoring"] = pd.to_numeric(enhanced["overUnder"], errors="coerce")
-        enhanced["expected_scoring"] = enhanced["expected_scoring"].fillna(enhanced["expected_scoring"].mean())
-
-        if "fpiOffensiveEfficiency" in enhanced.columns:
-            # Use home team indicator if available; otherwise neutral factor
-            home_indicator = np.where(enhanced.get("homeTeam").notna(), 1.1, 1.0) if "homeTeam" in enhanced.columns else 1.0
-            enhanced["scoring_efficiency_interaction"] = (
-                enhanced["expected_scoring"] * pd.to_numeric(enhanced["fpiOffensiveEfficiency"], errors="coerce").fillna(0)
-                * home_indicator
-            )
-
-    return enhanced
+def _default(bundle: Optional[Dict[str, Any]], key: str) -> float:
+    if bundle and key in bundle.get("inference_defaults", {}):
+        return float(bundle["inference_defaults"][key])
+    return float(_FALLBACK_DEFAULTS[key])
 
 
-# =========================
-# Prediction core
-# =========================
-def calculate_dynamic_weights(
+def _team_conference(df: pd.DataFrame, team: str) -> Optional[str]:
+    if "home_conference" in df.columns:
+        m = df.loc[df.get("homeTeam") == team, "home_conference"].dropna()
+        if not m.empty:
+            return m.iloc[-1]
+    if "away_conference" in df.columns:
+        m = df.loc[df.get("awayTeam") == team, "away_conference"].dropna()
+        if not m.empty:
+            return m.iloc[-1]
+    return None
+
+
+# =========================================================================
+# Prediction
+# =========================================================================
+def predict_score(
     home_team: str,
     away_team: str,
-    home_recent: pd.DataFrame,
-    away_recent: pd.DataFrame,
-    df: pd.DataFrame,
-) -> Dict[str, float]:
+    df: Optional[pd.DataFrame] = None,
+    season: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Predict a matchup and return a UI-friendly dict.
+
+    The output shape matches what ``app.py`` / ``predictions.js`` consume:
+    ``scores``, ``prediction`` (favorite/underdog/spread/total), ``factors`` and
+    ``weights`` (repurposed to model feature importances).
     """
-    Calculate dynamic weights based on team characteristics and data quality.
-    """
-    weights = {
-        "base_strength": 0.4,
-        "recent_form": 0.15,
-        "h2h": 0.1,
-        "conference": 0.25,
-        "efficiency": 0.30,
-        "rankings": 0.25,
-    }
+    bundle = get_model_bundle()
+    if bundle is None:
+        return _error("Model is not available. Run models/train.py to build it.")
 
-    # Conference strength / diff
-    home_conf = home_recent.get("home_conference").iloc[0] if "home_conference" in home_recent.columns and not home_recent.empty else "Unknown"
-    away_conf = away_recent.get("away_conference").iloc[0] if "away_conference" in away_recent.columns and not away_recent.empty else "Unknown"
+    if df is None:
+        df = get_games_df()
 
-    conf_games = df[
-        (df["home_conference"].isin([home_conf, away_conf])) | (df["away_conference"].isin([home_conf, away_conf]))
-    ] if {"home_conference", "away_conference"}.issubset(df.columns) else pd.DataFrame()
+    elo_state = _team_elo_state()
+    default_elo = _default(bundle, "default_elo")
+    home_elo = elo_state.get(home_team, np.nan)
+    away_elo = elo_state.get(away_team, np.nan)
+    low_confidence = bool(pd.isna(home_elo) or pd.isna(away_elo))
 
-    if len(conf_games) > 0 and {"homePoints", "awayPoints"}.issubset(conf_games.columns):
-        # Careful with precedence: use parentheses around each side
-        home_conf_wins = conf_games[
-            ((conf_games["home_conference"] == home_conf) & (conf_games["homePoints"] > conf_games["awayPoints"])) |
-            ((conf_games["away_conference"] == home_conf) & (conf_games["awayPoints"] > conf_games["homePoints"]))
-        ].shape[0] / conf_games.shape[0]
+    h_elo = default_elo if pd.isna(home_elo) else float(home_elo)
+    a_elo = default_elo if pd.isna(away_elo) else float(away_elo)
 
-        conf_diff = abs(home_conf_wins - 0.5)
-        weights["conference"] *= (1 + conf_diff)
-        weights["h2h"] *= (1 - conf_diff)
-
-    # Rankings diff (if present)
-    if {"fpi", "spOverall"}.issubset(df.columns):
-        home_rank = pd.to_numeric(home_recent.get("fpi", pd.Series(dtype=float)), errors="coerce").mean()
-        home_rank += pd.to_numeric(home_recent.get("spOverall", pd.Series(dtype=float)), errors="coerce").mean()
-        away_rank = pd.to_numeric(away_recent.get("fpi", pd.Series(dtype=float)), errors="coerce").mean()
-        away_rank += pd.to_numeric(away_recent.get("spOverall", pd.Series(dtype=float)), errors="coerce").mean()
-
-        # scale by global max to stay stable
-        global_max = pd.concat(
-            [
-                pd.to_numeric(df.get("fpi", pd.Series(dtype=float)), errors="coerce"),
-                pd.to_numeric(df.get("spOverall", pd.Series(dtype=float)), errors="coerce"),
-            ],
-            axis=0,
-        ).max()
-        if pd.isna(global_max) or global_max == 0:
-            global_max = 1.0
-        rank_diff = abs(home_rank - away_rank) / max(global_max, 1)
-        weights["rankings"] *= (1 + rank_diff)
-        weights["recent_form"] *= (1 - rank_diff * 0.5)
-
-    # Data quality (how much recent data we have)
-    home_data_quality = min(len(home_recent) / 12.0, 1.0)
-    away_data_quality = min(len(away_recent) / 12.0, 1.0)
-    dq = (home_data_quality + away_data_quality) / 2.0
-    weights["base_strength"] *= dq
-    weights["recent_form"] *= dq
-
-    # Normalize to sum 1
-    total = sum(weights.values())
-    if total <= 0:
-        # fallback
-        weights = {k: 1.0 / len(weights) for k in weights}
-    else:
-        weights = {k: v / total for k, v in weights.items()}
-    return weights
-
-
-def predict_game_score(
-    home_team: str, away_team: str, df: pd.DataFrame, season: int | None = None
-) -> Tuple[float | None, float | None, Dict[str, Any]]:
-    """
-    Predict game score using dynamically calculated weights.
-    Returns (home_score, away_score, details).
-    """
-    if df is None or df.empty:
-        return None, None, {}
-
-    # Narrow to the most recent rows for each side (based on team name columns you use on the site)
-    home_recent = df[df.get("homeTeam") == home_team].sort_values("startDate", ascending=False)
-    away_recent = df[df.get("awayTeam") == away_team].sort_values("startDate", ascending=False)
-    if len(home_recent) == 0 or len(away_recent) == 0:
-        return None, None, {}
-
-    def smean(x, default=0.0) -> float:
-        val = pd.to_numeric(x, errors="coerce").mean()
-        return float(val) if pd.notna(val) else float(default)
-
-    def sval(v, default=0.0) -> float:
-        try:
-            v = float(v)
-            return v if pd.notna(v) else float(default)
-        except Exception:
-            return float(default)
-
-    # Weights
-    WEIGHTS = calculate_dynamic_weights(home_team, away_team, home_recent, away_recent, df)
-
-    # Base metrics
-    home_avg = smean(df[df.get("homeTeam") == home_team]["homePoints"])
-    away_avg = smean(df[df.get("awayTeam") == away_team]["awayPoints"])
-    home_advantage = sval(smean(df["homePoints"]) - smean(df["awayPoints"]), 0.0)
-
-    # Strength vs league means
-    home_strength = sval(smean(home_recent["homePoints"]) - smean(df["homePoints"]), 0.0)
-    away_strength = sval(smean(away_recent["awayPoints"]) - smean(df["awayPoints"]), 0.0)
-
-    # Recent form (weighted last 5)
-    weights = [0.35, 0.25, 0.20, 0.15, 0.05]
-    h_pts = pd.to_numeric(home_recent["homePoints"], errors="coerce").dropna().head(5).tolist()
-    a_pts = pd.to_numeric(away_recent["awayPoints"], errors="coerce").dropna().head(5).tolist()
-    home_form = sval(np.average(h_pts[: len(weights)], weights=weights[: len(h_pts)]) - home_avg, 0.0) if h_pts else 0.0
-    away_form = sval(np.average(a_pts[: len(weights)], weights=weights[: len(a_pts)]) - away_avg, 0.0) if a_pts else 0.0
-
-    # H2H
-    h2h = df[
-        ((df.get("homeTeam") == home_team) & (df.get("awayTeam") == away_team))
-        | ((df.get("homeTeam") == away_team) & (df.get("awayTeam") == home_team))
-    ].sort_values("startDate", ascending=False)
-
-    h2h_factor = 0.0
-    if len(h2h) >= 3 and {"homePoints", "awayPoints"}.issubset(h2h.columns):
-        h2h_weights = [0.5, 0.3, 0.2]
-        h2h_games = h2h.head(3)[["homeTeam", "homePoints", "awayPoints"]]
-        deltas = (h2h_games["homePoints"] - h2h_games["awayPoints"]).tolist()
-        w = h2h_weights[: len(deltas)]
-        h2h_factor = sval(np.average(deltas, weights=w), 0.0)
-        # If last meeting had teams flipped, invert sign
-        if not h2h_games.empty and h2h_games.iloc[0]["homeTeam"] == away_team:
-            h2h_factor *= -1
-
-    # Conference stats
-    conf_stats = {
-        "home": {"points": 0.0, "offense": 0.0, "defense": 0.0},
-        "away": {"points": 0.0, "offense": 0.0, "defense": 0.0},
-    }
-    epa_available = {"home_epa", "away_epa", "home_epaAllowed", "away_epaAllowed"}.issubset(df.columns)
-
-    if {"home_conference", "away_conference"}.issubset(df.columns):
-        home_conf = home_recent.get("home_conference").iloc[0] if "home_conference" in home_recent.columns and not home_recent.empty else "Unknown"
-        away_conf = away_recent.get("away_conference").iloc[0] if "away_conference" in away_recent.columns and not away_recent.empty else "Unknown"
-
-        home_conf_data = df[df["home_conference"] == home_conf]
-        away_conf_data = df[df["away_conference"] == away_conf]
-
-        conf_stats["home"]["points"] = smean(home_conf_data["homePoints"])
-        conf_stats["away"]["points"] = smean(away_conf_data["awayPoints"])
-        if epa_available:
-            conf_stats["home"]["offense"] = smean(home_conf_data["home_epa"])
-            conf_stats["home"]["defense"] = smean(home_conf_data["home_epaAllowed"])
-            conf_stats["away"]["offense"] = smean(away_conf_data["away_epa"])
-            conf_stats["away"]["defense"] = smean(away_conf_data["away_epaAllowed"])
-
-    conf_diff = sval(
-        (conf_stats["home"]["points"] - conf_stats["away"]["points"]) * WEIGHTS["conference"]
-        + (conf_stats["home"]["offense"] - conf_stats["away"]["offense"]) * (WEIGHTS["conference"] * 0.5)
-        - (conf_stats["home"]["defense"] - conf_stats["away"]["defense"]) * (WEIGHTS["conference"] * 0.5),
-        0.0,
+    same_conf = (
+        _team_conference(df, home_team) is not None
+        and _team_conference(df, home_team) == _team_conference(df, away_team)
     )
 
-    # Efficiency (EPA) diff
-    efficiency_diff = 0.0
-    if epa_available:
-        home_off = smean(home_recent["home_epa"])
-        home_def = smean(home_recent["home_epaAllowed"])
-        away_off = smean(away_recent["away_epa"])
-        away_def = smean(away_recent["away_epaAllowed"])
-        efficiency_diff = sval((home_off - away_def) * WEIGHTS["efficiency"] - (away_off - home_def) * WEIGHTS["efficiency"])
+    # Build a single synthetic, pre-game matchup row using as-of team state and
+    # neutral defaults for unknowable game-day context.
+    synthetic = pd.DataFrame([{
+        "homeStartElo": h_elo,
+        "awayStartElo": a_elo,
+        "home_rest_days": _default(bundle, "home_rest_days"),
+        "away_rest_days": _default(bundle, "away_rest_days"),
+        "neutralSite": False,
+        "conferenceGame": same_conf,
+        "week": _default(bundle, "week"),
+        "temperature": _default(bundle, "temperature"),
+        "windSpeed": _default(bundle, "wind_speed"),
+        "humidity": _default(bundle, "humidity"),
+        "precipitation": _default(bundle, "precipitation"),
+    }])
+    X = build_feature_frame(synthetic)
+    X.loc[:, "elo_missing"] = int(low_confidence)
 
-    # Rankings
-    rankings_impact = 0.0
-    if {"fpi", "spOverall"}.issubset(df.columns):
-        home_rank = smean(home_recent[["fpi", "spOverall"]].mean(axis=1))
-        away_rank = smean(away_recent[["fpi", "spOverall"]].mean(axis=1))
-        rankings_impact = sval((home_rank - away_rank) * WEIGHTS["rankings"])
+    margin = float(bundle["margin_model"].predict(X)[0])
+    total = float(bundle["total_model"].predict(X)[0])
 
-    # Weather (very light touch; if missing, neutral)
-    weather_impact = 0.0
-    if {"temperature", "windSpeed"}.issubset(df.columns) and len(df) > 0:
-        temp = sval(df["temperature"].iloc[0], 70)
-        wind = sval(df["windSpeed"].iloc[0], 0)
-        if temp < 40:
-            weather_impact -= 1
-        elif temp > 85:
-            weather_impact -= 0.5
-        if wind > 15:
-            weather_impact -= wind * 0.1
+    home_score = (total + margin) / 2.0
+    away_score = (total - margin) / 2.0
+    home_score = max(0.0, home_score)
+    away_score = max(0.0, away_score)
 
-    # Season progress
-    season_factor = 0.0
-    if season is not None and "week" in df.columns and "season" in df.columns:
-        current_week = sval(df[df["season"] == season]["week"].max(), 7)
-        season_progress = current_week / 14.0  # heuristic
-        season_factor = sval(season_progress * 2.0)
-
-    # Rest differential
-    rest_advantage = 0.0
-    if "rest_days" in df.columns:
-        h_rest = sval(home_recent.get("rest_days").iloc[0] if not home_recent.empty else 0.0)
-        a_rest = 0.0  # rest_days is already (home - away)
-        rest_advantage = sval(h_rest - a_rest, 0.0) * 0.5
-    elif {"home_rest_days", "away_rest_days"}.issubset(df.columns):
-        h_rest = sval(home_recent.get("home_rest_days").iloc[0] if "home_rest_days" in home_recent.columns and not home_recent.empty else 7.0)
-        a_rest = sval(away_recent.get("away_rest_days").iloc[0] if "away_rest_days" in away_recent.columns and not away_recent.empty else 7.0)
-        rest_advantage = sval(h_rest - a_rest, 0.0) * 0.5
-
-    # Final scores
-    home_score = sval(
-        home_avg
-        + home_strength * WEIGHTS["base_strength"]
-        + home_form * WEIGHTS["recent_form"]
-        + h2h_factor * WEIGHTS["h2h"]
-        + home_advantage
-        + conf_diff
-        + efficiency_diff
-        + rankings_impact
-        + weather_impact
-        + season_factor
-        + rest_advantage
-    )
-    away_score = sval(
-        away_avg
-        + away_strength * WEIGHTS["base_strength"]
-        + away_form * WEIGHTS["recent_form"]
-        - h2h_factor * WEIGHTS["h2h"]
-        - conf_diff
-        - efficiency_diff
-        - rankings_impact
-        + weather_impact
-        + season_factor
-        - rest_advantage
-    )
-
-    details = {
-        "base_scores": {"home": sval(home_avg), "away": sval(away_avg)},
-        "strength": {"home": sval(home_strength), "away": sval(away_strength)},
-        "form": {"home": sval(home_form), "away": sval(away_form)},
-        "h2h_factor": sval(h2h_factor),
-        "conf_stats": conf_stats,
-        "efficiency": {"diff": sval(efficiency_diff)},
-        "rankings": {"impact": sval(rankings_impact)},
-        "weather": {"impact": sval(weather_impact)},
-        "season": {"factor": sval(season_factor)},
-        "rest": {"advantage": sval(rest_advantage)},
-        "weights": WEIGHTS,
-    }
-    return round(home_score, 1), round(away_score, 1), details
-
-
-def predict_score(home_team: str, away_team: str, df: pd.DataFrame, season: int = 2024) -> Dict[str, Any]:
-    """
-    UI-friendly wrapper that returns a dict your site can render.
-    """
-    home_score, away_score, details = predict_game_score(home_team, away_team, df, season)
-    if home_score is None or away_score is None:
-        return {
-            "scores": None,
-            "prediction": None,
-            "factors": None,
-            "weights": None,
-            "error": "Insufficient data to make a prediction for the specified teams.",
-        }
+    # Prediction intervals from quantile models (if present).
+    intervals = _intervals(bundle, X, home_score, away_score)
 
     raw_spread = home_score - away_score
-    if raw_spread > 0:
+    if raw_spread >= 0:
         favorite, underdog, spread = home_team, away_team, -raw_spread
     else:
         favorite, underdog, spread = away_team, home_team, raw_spread
 
+    league_home_avg = bundle.get("league", {}).get("home_avg", 28.0)
+    league_away_avg = bundle.get("league", {}).get("away_avg", 24.0)
+
     return {
+        "error": None,
         "scores": {
             "home": {
                 "team": home_team,
-                "score": float(home_score),
+                "score": round(home_score, 1),
                 "stats": {
-                    "avg_score": float(details["base_scores"]["home"]),
-                    "strength": float(details["strength"]["home"]),
-                    "form": float(details["form"]["home"]),
-                    "conference_avg": float(details["conf_stats"]["home"]["points"]),
+                    "avg_score": round(float(league_home_avg), 1),
+                    "elo": round(h_elo, 0),
+                    "score_low": intervals["home_low"],
+                    "score_high": intervals["home_high"],
                 },
             },
             "away": {
                 "team": away_team,
-                "score": float(away_score),
+                "score": round(away_score, 1),
                 "stats": {
-                    "avg_score": float(details["base_scores"]["away"]),
-                    "strength": float(details["strength"]["away"]),
-                    "form": float(details["form"]["away"]),
-                    "conference_avg": float(details["conf_stats"]["away"]["points"]),
+                    "avg_score": round(float(league_away_avg), 1),
+                    "elo": round(a_elo, 0),
+                    "score_low": intervals["away_low"],
+                    "score_high": intervals["away_high"],
                 },
             },
         },
@@ -535,123 +298,69 @@ def predict_score(home_team: str, away_team: str, df: pd.DataFrame, season: int 
             "underdog": underdog,
             "spread": round(float(spread), 1),
             "total": round(float(home_score + away_score), 1),
+            "margin_range": intervals["margin_range"],
         },
         "factors": {
-            "rankings": round(float(details["rankings"]["impact"]), 1),
-            "efficiency": round(float(details["efficiency"]["diff"]), 1),
-            "h2h": round(float(details["h2h_factor"]), 1),
-            "weather": round(float(details["weather"]["impact"]), 1),
-            "rest": round(float(details["rest"]["advantage"]), 1),
+            "elo_difference": round(h_elo - a_elo, 0),
+            "home_field": round(float(bundle.get("league", {}).get("home_edge", 0.0)), 1),
+            "same_conference": bool(same_conf),
         },
-        "weights": {k: round(v * 100.0, 1) for k, v in details["weights"].items()},
+        # Repurposed: real model feature importances, normalized for display.
+        "weights": bundle.get("feature_importances", {}),
+        "low_confidence": low_confidence,
     }
 
 
-# =========================
-# Model IO (for your saved training artifacts)
-# =========================
-def initialize_model() -> bool:
-    """
-    Load saved models/encoders/features and the processed games CSV.
-    Your web app can import predictor.py and call predict_score with `games_df`.
-    """
-    global games_df, model_info, home_encoders
-    try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        save_path = os.path.join(current_dir, "saved")
-        data_path = os.path.join(os.path.dirname(current_dir), "data")
-
-        model_info = {
-            "models": {
-                "homePoints": {
-                    "model": joblib.load(os.path.join(save_path, "home_points_model.joblib")),
-                    "metrics": joblib.load(os.path.join(save_path, "home_points_metrics.joblib")),
-                },
-                "awayPoints": {
-                    "model": joblib.load(os.path.join(save_path, "away_points_model.joblib")),
-                    "metrics": joblib.load(os.path.join(save_path, "away_points_metrics.joblib")),
-                },
-            },
-            "imputer": joblib.load(os.path.join(save_path, "imputer.joblib")),
-            "encoders": joblib.load(os.path.join(save_path, "encoders.joblib")),
-            "features": joblib.load(os.path.join(save_path, "features.joblib")),
+def _intervals(bundle, X, home_score, away_score) -> Dict[str, Any]:
+    """Translate margin/total quantiles into per-score ranges."""
+    q = bundle.get("quantile_models")
+    if not q:
+        return {
+            "home_low": None, "home_high": None,
+            "away_low": None, "away_high": None,
+            "margin_range": None,
         }
-
-        games_df = pd.read_csv(os.path.join(data_path, "processed_games.csv"))
-        if "startDate" in games_df.columns:
-            games_df["startDate"] = pd.to_datetime(games_df["startDate"], errors="coerce")
-
-        # keep a lightly cleaned copy for inference
-        games_df = handle_missing_data(games_df)
-
-        home_encoders = model_info["encoders"]
-        return True
-    except Exception as e:
-        print(f"Error initializing model: {e}")
-        print("Ensure the training script has created the model files in ./saved and data/processed_games.csv exists.")
-        return False
+    m_lo = float(q["margin_lo"].predict(X)[0])
+    m_hi = float(q["margin_hi"].predict(X)[0])
+    t_lo = float(q["total_lo"].predict(X)[0])
+    t_hi = float(q["total_hi"].predict(X)[0])
+    return {
+        "home_low": round(max(0.0, (t_lo + m_lo) / 2.0), 1),
+        "home_high": round(max(0.0, (t_hi + m_hi) / 2.0), 1),
+        "away_low": round(max(0.0, (t_lo - m_hi) / 2.0), 1),
+        "away_high": round(max(0.0, (t_hi - m_lo) / 2.0), 1),
+        "margin_range": [round(m_lo, 1), round(m_hi, 1)],
+    }
 
 
-def save_models(
-    results: Dict[str, Any],
-    best_home_model_name: str,
-    best_away_model_name: str,
-    home_encoders_in: Dict[str, Any],
-    X_home_train: pd.DataFrame,
-    games_df_in: pd.DataFrame,
-) -> bool:
-    """
-    Persist trained models, metrics, preprocessors, selected features, and processed dataset.
-    """
-    try:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        save_path = os.path.join(current_dir, "saved")
-        data_path = os.path.join(os.path.dirname(current_dir), "data")
-        os.makedirs(save_path, exist_ok=True)
-        os.makedirs(data_path, exist_ok=True)
-
-        home_results = results["home"][best_home_model_name]
-        away_results = results["away"][best_away_model_name]
-
-        joblib.dump(home_results["model"], os.path.join(save_path, "home_points_model.joblib"))
-        joblib.dump(home_results["test_metrics"], os.path.join(save_path, "home_points_metrics.joblib"))
-
-        joblib.dump(away_results["model"], os.path.join(save_path, "away_points_model.joblib"))
-        joblib.dump(away_results["test_metrics"], os.path.join(save_path, "away_points_metrics.joblib"))
-
-        joblib.dump(home_results["imputer"], os.path.join(save_path, "imputer.joblib"))
-        joblib.dump(home_encoders_in, os.path.join(save_path, "encoders.joblib"))
-        joblib.dump(list(X_home_train.columns), os.path.join(save_path, "features.joblib"))
-
-        games_df_in.to_csv(os.path.join(data_path, "processed_games.csv"), index=False)
-        print("All models and data saved successfully!")
-        return True
-    except Exception as e:
-        print(f"Fatal error during save process: {e}")
-        return False
+def get_model_metrics() -> Dict[str, Any]:
+    """Return validation metrics for the /api/model-info endpoint."""
+    bundle = get_model_bundle()
+    if bundle is None:
+        return {"error": "Model not available."}
+    return {
+        "schema_version": bundle.get("schema_version"),
+        "trained_at": bundle.get("trained_at"),
+        "train_seasons": bundle.get("train_seasons"),
+        "test_season": bundle.get("test_season"),
+        "metrics": bundle.get("metrics"),
+        "library_versions": bundle.get("library_versions"),
+    }
 
 
-# =========================
-# Module init on import
-# =========================
-if initialize_model():
-    print("Model initialized successfully")
-else:
-    # You can choose to not hard-fail on import for web apps:
-    # raise RuntimeError("Failed to initialize model")
-    print("Warning: model failed to initialize on import. You can still load it later by calling initialize_model().")
+def _error(msg: str) -> Dict[str, Any]:
+    return {"scores": None, "prediction": None, "factors": None,
+            "weights": None, "error": msg}
 
 
 __all__ = [
-    "games_df",
-    "model_info",
-    "predict_game_score",
+    "FEATURES",
+    "build_feature_frame",
+    "compute_targets",
     "predict_score",
-    "add_enhanced_features",
-    "add_team_performance_context",
-    "add_enhanced_timing_features",
-    "add_enhanced_momentum_features",
-    "handle_missing_data",
-    "save_models",
-    "initialize_model",
+    "get_games_df",
+    "get_model_bundle",
+    "get_model_metrics",
+    "MODEL_PATH",
+    "SCHEMA_VERSION",
 ]
