@@ -3666,8 +3666,9 @@ body.home .theme-toggle:hover { border-color: var(--ds-accent); transform: trans
 /* ---- Hero / profile ---- */
 body.home .profile-info { text-align: center; padding: 56px 20px 8px; max-width: 900px; margin: 0 auto; }
 body.home .profile-info img {
-  width: 150px; height: 150px; border: 4px solid var(--ds-surface);
-  box-shadow: var(--ds-shadow-md); outline: 3px solid var(--ds-accent-soft);
+  width: 150px; height: 150px; padding: 0; box-sizing: border-box; object-fit: cover;
+  border: 4px solid var(--ds-surface); outline: none;
+  box-shadow: 0 0 0 3px var(--ds-accent-soft), var(--ds-shadow-md);
 }
 body.home .profile-info h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.02em; margin: 18px 0 6px; color: var(--ds-text); }
 body.home .profile-info p { color: var(--ds-text-muted); font-size: 1.1rem; }
