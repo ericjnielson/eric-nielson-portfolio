@@ -7,14 +7,27 @@
 </head>
 <body>
 
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">Eric Nielson</a>
+            <div class="nav-links">
+                <a href="#highlights">Highlights</a>
+                <a href="#leadership">Leadership</a>
+                <a href="#work">Work</a>
+                <a href="#projects">Projects</a>
+                <a href="#timeline">Timeline</a>
+                <a href="#connect">Connect</a>
+            </div>
+        </div>
+    </nav>
 
     <div class="profile-info">
         <img src="/static/Headshot.PNG" alt="Eric Nielson">
         <h1>Eric Nielson, EdD, MBA</h1>
-        <p>Senior Product Manager | Major</p>
+        <p>Senior Manager, Product Management at Komodo Health | Air Force Major</p>
     </div>
 
-    <div class="highlights-section">
+    <div class="highlights-section" id="highlights">
         <h1>Career Highlights</h1>
         <div class="highlights-grid">
             <div class="highlight-card">
@@ -49,20 +62,43 @@
         </div>
     </div>
 
-    <div class="portfolio">
+    <div class="leadership-section" id="leadership">
+        <h1>Leadership Philosophy</h1>
+        <p class="leadership-intro">As Senior Manager, Product Management at Komodo Health, I lead a team of product managers and designers building enterprise healthcare analytics. My approach blends doctoral research in psychological safety, two decades of military command, and MBA-level instruction into a single conviction: high-trust teams ship better products, faster.</p>
+        <div class="leadership-grid">
+            <div class="leadership-card">
+                <h3>🌱 Mentoring &amp; Growing Talent</h3>
+                <p>I directly manage a Senior Product Manager and three designers, creating the feedback loops, coaching, and stretch opportunities that help them grow into their next roles. Developing people is the highest-leverage work a manager does.</p>
+            </div>
+            <div class="leadership-card">
+                <h3>🧭 Product Vision &amp; Strategy</h3>
+                <p>I set portfolio-level vision and a prioritized roadmap, aligning discovery, design, and delivery around the customer problems that move revenue, adoption, and retention.</p>
+            </div>
+            <div class="leadership-card">
+                <h3>📈 Executive Influence</h3>
+                <p>I translate customer signal and data into the narratives that earn executive buy-in—securing investment and alignment across GTM, engineering, and the C-suite.</p>
+            </div>
+            <div class="leadership-card">
+                <h3>🤝 Building High-Trust Teams</h3>
+                <p>Grounded in my EdD research on psychological safety, I build operating cadences and communication norms that let teams take smart risks, surface problems early, and move quickly without sacrificing quality.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="portfolio" id="work">
         <h1>Work Examples</h1>
 
         <div class="portfolio-item">
-            <img src="/static/maplab.png" alt="MapLab">
+            <img src="/static/maplab.png" alt="MapLab" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>MapLab</h3>
-                <p>A unified healthcare software suite powered by the Komodo Healthcare Map to scale insight generation, decision-making, and the product life cycle</p>
+                <p>A unified healthcare software suite powered by Komodo Health's Healthcare Map to scale insight generation, decision-making, and the product life cycle</p>
                 <a href="/maplab">View</a>
             </div>
         </div>
 
         <div class="portfolio-item">
-            <img src="/static/voc.jpg" alt="VOC">
+            <img src="/static/voc.jpg" alt="VOC" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>Voice of the Customer Program</h3>
                 <p>Established company-wide VOC program, synthesizing 300+ data points to drive 50+ feature enhancements.</p>
@@ -71,7 +107,7 @@
         </div>
 
         <div class="portfolio-item">
-            <img src="/static/peas.jpg" alt="PEAS">
+            <img src="/static/peas.jpg" alt="PEAS" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>Amazon High Traffic Events</h3>
                 <p>Led global advertising across Prime Day, Black Friday/Cyber Monday, and Prime Early Access Sale events.</p>
@@ -80,7 +116,7 @@
         </div>
 
         <div class="portfolio-item">
-            <img src="/static/liveconnect.jpg" alt="LiveConnect">
+            <img src="/static/liveconnect.jpg" alt="LiveConnect" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>ESPN's LiveConnect</h3>
                 <p>Developed emotion-based advertising product leveraging real-time sports data and fan engagement.</p>
@@ -89,7 +125,7 @@
         </div>
 
         <div class="portfolio-item">
-            <img src="/static/dissertation.jpg" alt="Dissertation">
+            <img src="/static/dissertation.jpg" alt="Dissertation" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>Doctoral Dissertation</h3>
                 <p>Investigating the role of psychological safety in military officer candidates.</p>
@@ -98,11 +134,11 @@
         </div>
     </div>
 
-    <div class="portfolio">
+    <div class="portfolio" id="projects">
         <h1>Personal Projects</h1>
         
         <div class="portfolio-item" data-project="logo">
-            <img src="/static/football.jpg" alt="College Football Prediction Model">
+            <img src="/static/football.jpg" alt="College Football Prediction Model" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>College Football Prediction Model</h3>
                 <p>A machine learning model to predict college football scores and spreads using historical data and advanced analytics.</p>
@@ -111,7 +147,7 @@
         </div>
     
         <div class="portfolio-item" data-project="logo">
-            <img src="/static/uagc.jpg" alt="Teaching Assistant Agent">
+            <img src="/static/uagc.jpg" alt="Teaching Assistant Agent" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>MBA Teaching Assistant</h3>
                 <p>An AI Teaching Assistant that provides detailed feedback and evaluation for student discussion posts using natural language processing.</p>
@@ -120,7 +156,7 @@
         </div>
     
         <div class="portfolio-item">
-            <img src="/static/palette.jpg" alt="Color Generator">
+            <img src="/static/palette.jpg" alt="Color Generator" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>AI-Powered Color Palette Generator</h3>
                 <p>Change this site's background with a prompt using zero-shot AI Engineering. Enter a description or theme to generate a custom color palette.</p>
@@ -132,7 +168,7 @@
         </div>
     
         <div class="portfolio-item" data-project="logo">
-            <img src="/static/planning.jpg" alt="Product Planning">
+            <img src="/static/planning.jpg" alt="Product Planning" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>Feature ROI Forecasting</h3>
                 <p>My take on product planning and strategy activities and how organizations can improve those</p>
@@ -141,7 +177,7 @@
         </div>
     
         <div class="portfolio-item" data-project="logo">
-            <img src="/static/lake.jpg" alt="Reinforcement Learning">
+            <img src="/static/lake.jpg" alt="Reinforcement Learning" loading="lazy" decoding="async">
             <div class="portfolio-item-content">
                 <h3>Reinforcement Learning</h3>
                 <p>An exploration of reinforcement learning algorithms and applications in decision-making systems.</p>
@@ -153,7 +189,7 @@
     <div id="toastContainer" class="toast-container"></div>
     
 
-    <div class="portfolio">
+    <div class="portfolio" id="timeline">
         <h1>Career Timeline</h1>
     </div>
     <div class="timeline">
@@ -168,8 +204,10 @@
             <span>Aug 2024</span>
         </div>
         <div class="timeline-item">
-            <h3>Senior Product Manager, Komodo Healthcare</h3>
+            <h3>Senior Manager, Product Management, Komodo Health</h3>
             <span>Mar 2023 – Present</span>
+            <p><em>Promoted from Senior Product Manager; now lead a team of product managers and designers.</em></p>
+            <p>Mentor and develop a Senior PM and three designers, setting portfolio vision and the operating cadences that keep discovery, design, and delivery aligned.</p>
             <p>Achieved 100%+ year-over-year portfolio growth while retaining 80%+ of customers through cross-functional roadmap alignment, disciplined release execution, and value-driven delivery.</p>
             <p>Architected and launched LLM-powered analytics features that cut time-to-insight by 85%, enabling over 50% of users to generate actionable insights in under 10 minutes.</p>
             <p>Launched a self-service data marketplace that shortened the data acquisition timeline from 1–2 weeks to under 20 minutes, eliminating manual dependencies and enabling scalable product-led growth.</p>
@@ -213,17 +251,17 @@
         </div>
     </div>
 
-    <div class="connect-section">
+    <div class="connect-section" id="connect">
         <h2>Connect With Me</h2>
         <div class="social-buttons">
             <a href="/static/Eric_Nielson_SrProductManager_Website.docx" class="social-icon" download>
-                <img src="/static/resume.png" alt="Download Resume" title="Download Resume">
+                <img src="/static/resume.png" alt="Download Resume" title="Download Resume" loading="lazy" decoding="async">
             </a>
             <a href="https://www.linkedin.com/in/ericjnielson/" class="social-icon" target="_blank">
-                <img src="/static/linkedin.png" alt="LinkedIn" title="Connect on LinkedIn">
+                <img src="/static/linkedin.png" alt="LinkedIn" title="Connect on LinkedIn" loading="lazy" decoding="async">
             </a>
             <a href="mailto:ericjnielson2@gmail.com" class="social-icon">
-                <img src="/static/gmail.png" alt="Gmail" title="Email Me">
+                <img src="/static/gmail.png" alt="Gmail" title="Email Me" loading="lazy" decoding="async">
             </a>
         </div>
     </div>

@@ -3,7 +3,8 @@
 This README is designed as a quick, high-signal briefing for talent partners assessing my fit for senior product leadership roles. You will find results, case studies, and proof points that map directly to the questions most teams ask during executive screens.
 
 ## Snapshot
-- **Enterprise impact:** Built and scaled products at Komodo Health, Amazon, and Disney that unlocked over $500M in new revenue, efficiency, and retention.
+- **Enterprise impact:** Built and scaled products at Komodo Health, Amazon, and Disney that unlocked over $600M in new revenue, efficiency, and retention.
+- **People leadership:** Senior Manager, Product Management at Komodo Health, leading and mentoring a team of product managers and designers.
 - **Operational range:** Air Force Major and adjunct MBA professor with a track record leading cross-functional teams through ambiguity, transformation, and high-stakes launches.
 - **Builder mindset:** Ship AI-enabled workflows, experimentation frameworks, and data-rich storytelling that connect strategy to measurable outcomes.
 

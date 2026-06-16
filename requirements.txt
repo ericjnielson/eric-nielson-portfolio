@@ -1,23 +1,29 @@
-eventlet
-opencv-python
-numpy
-python-dotenv
-openai
-flask
-flask-cors
-flask-socketio
-gymnasium
-opencv-python
-numpy
-scipy
-scikit-learn
-pandas
-joblib
-requests
-pandas
-xgboost
-gql
-aiohttp
-seaborn
+# Web / app
+eventlet>=0.35
+flask>=3.0
+flask-cors>=4.0
+flask-socketio>=5.3
+python-dotenv>=1.0
+openai>=1.30
+requests>=2.31
+gql>=3.5
+aiohttp>=3.9
+
+# Vision / RL demos
+opencv-python>=4.9
+gymnasium>=0.29
+
+# Data / ML stack — pinned for model-artifact reproducibility.
+# The CFB model bundle (models/saved/cfb_model.joblib) is serialized with these
+# versions; loading it with a very different major version may fail.
+numpy==2.4.6
+scipy==1.17.1
+pandas==3.0.3
+scikit-learn==1.9.0
+xgboost==3.2.0
+joblib==1.5.3
+seaborn>=0.13
+
+# Build
 setuptools>=68.0.0
 wheel>=0.41.0
