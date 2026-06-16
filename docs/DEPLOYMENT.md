@@ -14,25 +14,17 @@ You only need to do the one-time setup below once. After that, every merge to
 
 Run these in Cloud Shell (or locally with `gcloud`). Fill in the values at top.
 
-First, confirm your Cloud Run service name and region (the project name is not
-the service name):
+The live portfolio is the `eniel-portfolio` service in `us-central1`
+(https://eniel-portfolio-1048043412760.us-central1.run.app).
 
 ```bash
-gcloud run services list --project robotic-branch-452315-m3
-```
-
-Look at the `SERVICE` and `REGION` columns. Based on the live URL
-(`idx-test2-3592241-4xeemoth6q-ul.a.run.app`) the service is almost certainly
-`idx-test2-3592241` — but use whatever the command prints.
-
-```bash
-# ---- fill these in ----
+# ---- values for this project ----
 export PROJECT_ID="robotic-branch-452315-m3"
-export REGION="us-east5"                       # confirm with the command above
-export SERVICE="idx-test2-3592241"             # confirm with the command above
+export REGION="us-central1"
+export SERVICE="eniel-portfolio"
 export REPO="ericjnielson/eric-nielson-portfolio"
 export DEPLOYER="gh-deployer"                  # name for the deploy service account
-# -----------------------
+# ----------------------------------
 
 export PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 gcloud config set project "$PROJECT_ID"
@@ -93,7 +85,7 @@ repository variable**. Add:
 | --- | --- |
 | `GCP_PROJECT_ID` | your project id |
 | `CLOUD_RUN_SERVICE` | your Cloud Run service name |
-| `GCP_REGION` | `us-east5` (optional; this is the default) |
+| `GCP_REGION` | `us-central1` (optional; this is the default) |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | the `projects/.../providers/github-provider` string printed above |
 | `GCP_DEPLOY_SERVICE_ACCOUNT` | the `gh-deployer@...` email printed above |
 

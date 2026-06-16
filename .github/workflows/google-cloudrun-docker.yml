@@ -6,9 +6,9 @@ name: 'Deploy to Cloud Run'
 # One-time setup is documented in docs/DEPLOYMENT.md. In short, set these
 # GitHub repository *Variables* (Settings -> Secrets and variables -> Actions ->
 # Variables):
-#   GCP_PROJECT_ID                  e.g. my-portfolio-project
-#   CLOUD_RUN_SERVICE               the existing Cloud Run service name
-#   GCP_REGION                      optional, defaults to us-east5
+#   GCP_PROJECT_ID                  e.g. robotic-branch-452315-m3
+#   CLOUD_RUN_SERVICE               e.g. eniel-portfolio
+#   GCP_REGION                      optional, defaults to us-central1
 #   GCP_WORKLOAD_IDENTITY_PROVIDER  projects/NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
 #   GCP_DEPLOY_SERVICE_ACCOUNT      deployer@PROJECT.iam.gserviceaccount.com
 
@@ -45,7 +45,7 @@ jobs:
         uses: 'google-github-actions/deploy-cloudrun@v2'
         with:
           service: '${{ vars.CLOUD_RUN_SERVICE }}'
-          region: '${{ vars.GCP_REGION || ''us-east5'' }}'
+          region: '${{ vars.GCP_REGION || ''us-central1'' }}'
           source: '.'
           # Env vars already configured on the service (e.g. OPENAI_API_KEY) are
           # preserved because none are overridden here.
