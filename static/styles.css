@@ -484,6 +484,49 @@ form {
             color: #ecf0f1;
         }
 
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 22px;
+            margin-left: auto;
+        }
+
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: #ecf0f1;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .nav-container {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .nav-links {
+                margin-left: 0;
+                gap: 14px;
+            }
+            .nav-links a {
+                font-size: 0.85rem;
+            }
+        }
+
+        /* Smooth-scroll + offset so sticky navbar doesn't cover anchors */
+        html {
+            scroll-behavior: smooth;
+        }
+        [id] {
+            scroll-margin-top: 80px;
+        }
+
         #chat-container {
             width: 400px;
             background: white;
@@ -2473,6 +2516,71 @@ body {
     
     .highlight-card {
         padding: 25px;
+    }
+}
+
+/* Leadership Philosophy section */
+.leadership-section {
+    padding: 20px;
+    margin: 20px auto;
+    max-width: 1200px;
+}
+
+.leadership-section h1 {
+    text-align: center;
+    font-size: 2rem;
+    color: var(--secondary-color);
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 10px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.leadership-intro {
+    text-align: center;
+    max-width: 850px;
+    margin: 0 auto 30px;
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: #444;
+}
+
+.leadership-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.leadership-card {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    padding: 24px;
+    transition: var(--transition);
+}
+
+.leadership-card:hover {
+    transform: translateY(-4px);
+}
+
+.leadership-card h3 {
+    color: var(--secondary-color);
+    margin: 0 0 12px 0;
+    font-size: 1.15rem;
+}
+
+.leadership-card p {
+    color: #666;
+    margin: 0;
+    line-height: 1.6;
+    font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+    .leadership-grid {
+        grid-template-columns: 1fr;
     }
 }
 
