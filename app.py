@@ -251,7 +251,7 @@ class PortfolioApp:
         return render_template('Liveconnect.html')
 
     def maplab(self):
-        return render_template('Maplab.html')
+        return render_template('maplab.html')
 
     def peas(self):
         return render_template('Peas.html')
