@@ -12,6 +12,7 @@ aiohttp>=3.9
 # Vision / RL demos
 opencv-python>=4.9
 gymnasium>=0.29
+pygame>=2.5            # required for FrozenLake render_mode="rgb_array"
 
 # Data / ML stack — pinned for model-artifact reproducibility.
 # The CFB model bundle (models/saved/cfb_model.joblib) is serialized with these

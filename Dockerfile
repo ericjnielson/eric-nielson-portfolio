@@ -1,9 +1,12 @@
 FROM python:3.11-slim AS base
 
-# Set Python to run in unbuffered mode and disable writing .pyc files
+# Set Python to run in unbuffered mode and disable writing .pyc files.
+# SDL_*=dummy lets pygame render FrozenLake frames headlessly (no display/audio).
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8080
+    PORT=8080 \
+    SDL_VIDEODRIVER=dummy \
+    SDL_AUDIODRIVER=dummy
 
 WORKDIR /app
 
