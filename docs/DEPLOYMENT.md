@@ -14,13 +14,24 @@ You only need to do the one-time setup below once. After that, every merge to
 
 Run these in Cloud Shell (or locally with `gcloud`). Fill in the values at top.
 
+First, confirm your Cloud Run service name and region (the project name is not
+the service name):
+
+```bash
+gcloud run services list --project robotic-branch-452315-m3
+```
+
+Look at the `SERVICE` and `REGION` columns. Based on the live URL
+(`idx-test2-3592241-4xeemoth6q-ul.a.run.app`) the service is almost certainly
+`idx-test2-3592241` — but use whatever the command prints.
+
 ```bash
 # ---- fill these in ----
-export PROJECT_ID="your-gcp-project-id"
-export REGION="us-east5"                      # matches .idx/integrations.json
-export SERVICE="your-cloud-run-service-name"  # the existing service behind your *.run.app URL
+export PROJECT_ID="robotic-branch-452315-m3"
+export REGION="us-east5"                       # confirm with the command above
+export SERVICE="idx-test2-3592241"             # confirm with the command above
 export REPO="ericjnielson/eric-nielson-portfolio"
-export DEPLOYER="gh-deployer"                 # name for the deploy service account
+export DEPLOYER="gh-deployer"                  # name for the deploy service account
 # -----------------------
 
 export PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
