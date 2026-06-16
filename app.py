@@ -3,7 +3,6 @@ eventlet.monkey_patch()
 
 # Standard library imports
 import os
-import re
 import json
 import base64
 import socket
@@ -14,7 +13,6 @@ from typing import Dict, List
 import cv2
 import numpy as np
 from dotenv import load_dotenv
-from openai import OpenAI
 from flask import Flask, request, render_template, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
@@ -66,7 +64,6 @@ class PortfolioApp:
         )
 
         # Initialize components
-        self.client = OpenAI(api_key=self.openai_api_key)
         self.forecaster = RevenueForecast()
         self.teaching_assistant = self.initialize_teaching_assistant()
         
@@ -161,11 +158,6 @@ class PortfolioApp:
             return self.forecasting()
 
         # API routes
-        # Color Generator
-        @self.app.route('/generate_colors', methods=['POST'])
-        def generate_colors():
-            return self.generate_colors()
-        
         # CFB Predictor
         @self.app.route('/api/teams')
         def get_teams():
@@ -273,48 +265,6 @@ class PortfolioApp:
 
     def predictions(self):
         return render_template('cfbpredictions.html')
-
-    # Color Generator handlers
-    def generate_colors(self):
-        try:
-            data = request.json
-            print(f"Received data: {data}")
-
-            if not data or "message" not in data:
-                raise ValueError("Invalid input: 'message' field is required.")
-
-            msg = data.get("message", "").strip()
-            if not msg:
-                raise ValueError("Input 'message' cannot be empty.")
-
-            prompt = f"""
-            You are a color palette generating assistant. Create a harmonious color palette based on this theme: {msg}
-            Rules:
-            1. Return ONLY hex color codes
-            2. Provide 2-8 colors
-            3. Format each color as: #RRGGBB
-            4. Colors should work well together visually
-            Example output: #FF5733 #33FF57 #5733FF
-            """
-
-            response = self.client.chat.completions.create(
-                model="gpt-4",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=100,
-                temperature=0.7
-            )
-
-            assistant_reply = response.choices[0].message.content.strip()
-            colors = re.findall(r"#(?:[0-9a-fA-F]{6})", assistant_reply)
-
-            if not colors:
-                raise ValueError("No valid colors found in the OpenAI response.")
-
-            return jsonify({"colors": colors})
-
-        except Exception as e:
-            print(f"Error in /generate_colors: {e}")
-            return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
     # CFB Predictor handlers
     def get_teams(self):
