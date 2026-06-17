@@ -3850,3 +3850,9 @@ label, .form-group label { color: var(--ds-text); }
 
 /* Status pill on the RL page */
 #modelStatus { background: var(--ds-surface-2); color: var(--ds-text); }
+
+/* Layout wrappers stay transparent so inner cards pop on the page background */
+.content-wrapper { background: transparent; box-shadow: none; }
+.prediction-form, .input-form { background: transparent; }
+.forecast-container { background: var(--ds-surface); border: 1px solid var(--ds-border); }
+.field-toggle { background: var(--ds-surface-2); }
