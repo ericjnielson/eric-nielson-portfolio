@@ -1,27 +1,6 @@
-// ---- Homepage: theme toggle, scroll-spy nav, reveal-on-scroll ----
+// ---- Homepage: scroll-spy nav + reveal-on-scroll (theme toggle lives in theme.js) ----
 (function () {
-  function syncToggleIcon() {
-    var btn = document.getElementById('themeToggle');
-    if (!btn) return;
-    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-    var icon = btn.querySelector('.theme-toggle__icon');
-    if (icon) icon.textContent = dark ? '☀️' : '🌙'; // sun / moon
-    btn.setAttribute('aria-pressed', String(dark));
-  }
-
   document.addEventListener('DOMContentLoaded', function () {
-    // Theme toggle
-    var btn = document.getElementById('themeToggle');
-    if (btn) {
-      syncToggleIcon();
-      btn.addEventListener('click', function () {
-        var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        try { localStorage.setItem('theme', next); } catch (e) {}
-        syncToggleIcon();
-      });
-    }
-
     if (!document.body.classList.contains('home')) return;
 
     // Reveal-on-scroll

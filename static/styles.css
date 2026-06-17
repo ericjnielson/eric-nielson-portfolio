@@ -3748,3 +3748,105 @@ body.home .reveal.in-view { opacity: 1; transform: none; }
   body.home .reveal { opacity: 1 !important; transform: none !important; transition: none; }
   html { scroll-behavior: auto; }
 }
+
+/* ============================================================
+   Site-wide theming — makes every page match the homepage and
+   support dark mode. Uses the same design tokens; light values
+   mirror the previous palette so light mode looks unchanged.
+   ============================================================ */
+body {
+  font-family: var(--ds-font);
+  background: var(--ds-bg);
+  color: var(--ds-text);
+  transition: background .3s ease, color .3s ease;
+}
+
+/* Navbar (consistent across all pages) */
+.navbar {
+  background: var(--ds-surface);
+  background: color-mix(in srgb, var(--ds-surface) 85%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--ds-border);
+  box-shadow: none;
+}
+.nav-logo { color: var(--ds-text); font-weight: 800; letter-spacing: -0.01em; }
+.nav-logo:hover { color: var(--ds-accent); }
+.theme-toggle {
+  margin-left: auto; width: 38px; height: 38px; border-radius: 50%;
+  background: var(--ds-surface-2); border: 1px solid var(--ds-border); color: var(--ds-text);
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1rem; line-height: 1; transition: transform .2s ease, border-color .2s ease;
+}
+.theme-toggle:hover { border-color: var(--ds-accent); transform: translateY(-1px); }
+
+/* Page wrappers — let text inherit token colors for dark-mode readability */
+.container, .teaching-container, .main-container, .content-wrapper,
+.content, .left-section, .right-section { color: var(--ds-text); }
+
+/* Headings, body text, links */
+.container h1, .container h2, .container h3, .container h4,
+.teaching-container h1, .teaching-container h2, .teaching-container h3,
+.main-container h1, .main-container h2, .main-container h3,
+.content-wrapper h1, .content-wrapper h2, .content-wrapper h3 { color: var(--ds-text); }
+.container a, .teaching-container a, .main-container a { color: var(--ds-accent); }
+
+/* Case-study header: clean, like the homepage (no blue banner) */
+header, .header {
+  background: transparent; color: var(--ds-text); box-shadow: none; text-align: center;
+}
+.header h1 { color: var(--ds-text); font-weight: 800; letter-spacing: -0.01em; }
+.header p, .header .tagline, .tagline { color: var(--ds-text-muted); }
+.header a { color: var(--ds-accent); }
+
+/* Cards / panels → surface */
+.project-journey, .journey-card, .model-panel, .control-panel, .progress-panel,
+.results-panel, .prediction-panel, .metric-card, .visualization-container,
+.achievement, .stat, .feature-section {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius);
+  box-shadow: var(--ds-shadow-sm);
+  color: var(--ds-text);
+}
+.journey-card { border-left: 4px solid var(--ds-accent); }
+.journey-section h2, .journey-card h3 { color: var(--ds-text); }
+.journey-section p, .journey-card li, .metric-card p, .metric-label,
+.helper-text, .sublabel, .stat p { color: var(--ds-text-muted); }
+.achievement h2, .stat .metric-value, .metric-value, .score { color: var(--ds-accent); }
+
+/* Lists / steps */
+.styled-list li, .step {
+  background: var(--ds-surface-2); border-left: 5px solid var(--ds-accent); color: var(--ds-text);
+}
+
+/* Tables */
+.styled-table { background: var(--ds-surface); }
+.styled-table th { background: var(--ds-accent); color: #fff; border-color: var(--ds-border); }
+.styled-table td { color: var(--ds-text); border-color: var(--ds-border); }
+.styled-table tr:nth-child(even) td { background: var(--ds-surface-2); }
+
+/* Tabs */
+.tab-btn { background: var(--ds-surface-2); color: var(--ds-text); }
+.tab-btn:hover, .tab-btn.active { background: var(--ds-accent); color: #fff; }
+
+/* Quotes */
+.quote { color: var(--ds-text-muted); border-left: 3px solid var(--ds-accent); }
+
+/* Form controls */
+input, select, textarea, .range-input, .field-toggle-btn {
+  background: var(--ds-surface); color: var(--ds-text); border: 1px solid var(--ds-border);
+}
+.field-toggle-btn.active { background: var(--ds-accent); color: #fff; border-color: var(--ds-accent); }
+label, .form-group label { color: var(--ds-text); }
+
+/* Buttons → accent (Tailwind color classes in markup are inert without Tailwind) */
+.control-button, .predict-button, .primary-button {
+  background: var(--ds-accent); color: #fff; border: none; border-radius: 8px; cursor: pointer;
+  transition: background .2s ease;
+}
+.control-button:hover, .predict-button:hover, .primary-button:hover { background: var(--ds-accent-strong); }
+.control-button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Status pill on the RL page */
+#modelStatus { background: var(--ds-surface-2); color: var(--ds-text); }
