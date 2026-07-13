@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Portfolio</title>
+        <link rel="stylesheet" href="/static/styles.css">
+        <script src="/static/theme.js"></script>
+</head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-C7M0GTCBJX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-C7M0GTCBJX');
+</script>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">Home</a>
+            <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle dark mode" aria-pressed="false"><span class="theme-toggle__icon" aria-hidden="true">🌙</span></button>
+
+        </div>
+    </nav>
+
+    <div class="container">
+        <header class="header">
+            <h1>Aperture 2.0 Product Management</h1>
+            <p>Aperture 2.0 (Marmot) is Komodo Health's AI-powered Medical Affairs platform that transforms how pharma teams identify, engage, and act on Key Opinion Leader intelligence in real time.</p>
+            <p><i>Specific company data is masked below due to the open source nature of this project.</i></p>
+        </header>
+
+        <div class="content">
+            <div class="left-section">
+                <h2>About the Problem</h2>
+                <p>Medical Affairs teams at pharmaceutical companies face a critical strategy-to-execution gap. Home office leaders lack real-time patient data and the flexibility to customize KOL scoring for therapeutic area-specific needs, trapping them in rigid, slow-moving consulting cycles that cost $500K+ per year. Meanwhile, field teams miss real-time clinical signals needed to reach "rising stars" and relevant KOLs before the competition defines the narrative.</p>
+                <p>As the Senior Product Manager, I led the development of Aperture 2.0 to bridge this gap by replacing static, consultant-driven workflows with an AI-first platform that enables continuous discovery, natural language customization, and seamless CRM delivery.</p>
+
+                <h2>Goals</h2>
+                <ul class="styled-list">
+                    <li>🤖 <strong>AI-Driven KOL Discovery</strong> – Continuously monitor scientific shifts and pinpoint "rising stars" by detecting emerging patterns across global research, trials, and congresses</li>
+                    <li>💬 <strong>Natural Language Customization</strong> – Enable home office teams to instantly customize KOL scoring and tiering using simple, plain-language requests</li>
+                    <li>🌐 <strong>360° Field Intelligence</strong> – Surface clinical signals across claims, clinical trials, congresses, and scientific publications that siloed legacy sources fail to detect</li>
+                    <li>🚀 <strong>Seamless Field Execution</strong> – Push prioritized lists and governed insights directly into the MSL's daily workflow via CRM integration</li>
+                </ul>
+
+                <h2>Challenges & Solutions</h2>
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th>Challenge</th>
+                            <th>Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>KOL lists couldn't be defended because the AI logic was a black box and the data was months old</td>
+                            <td>Every insight is verifiable and grounded in the Healthcare Map, giving users confidence in investment decisions with full transparency into the scoring methodology</td>
+                        </tr>
+                        <tr>
+                            <td>Custom scoring took 6 weeks and $150K+ for a consulting project, creating dependency on external vendors</td>
+                            <td>Built natural language customization that lets users instantly tune scoring and tiering criteria, eliminating the consulting dependency entirely</td>
+                        </tr>
+                        <tr>
+                            <td>Fragmented data was not actionable; national strategies failed to convert into territory-specific tasks for field teams</td>
+                            <td>Transformed static data into dynamic, prioritized lists that push directly into CRM workflows, ensuring strategy reaches the field in an actionable format</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="process">
+                    <h2>Development Timeline</h2>
+                    <div class="steps">
+                        <div class="step">Identified the strategy-to-execution gap through extensive Medical Affairs customer research and competitive analysis</div>
+                        <div class="step">Designed the AI-driven discovery engine to continuously monitor patient insights, clinical trials, and congress data</div>
+                        <div class="step">Built natural language customization to replace expensive consulting workflows for KOL scoring and tiering</div>
+                        <div class="step">Developed the Analysis Canvas with deep contextual HCP profiles, geographic mapping, and tiered segmentation</div>
+                        <div class="step">Launched CRM integration to push prioritized lists and network insights directly into field team workflows</div>
+                    </div>
+                </div>
+
+                <h2>AI Evaluations</h2>
+                <p>Because Aperture 2.0's core value depends on trustworthy AI output — KOL scoring, profile briefs, and natural language customization — I built a structured evaluation program to measure and improve quality before and after every release.</p>
+                <ul class="styled-list">
+                    <li>📋 <strong>Golden Datasets</strong> – Partnered with Medical Affairs subject matter experts to curate reference sets of KOL rankings, profile summaries, and natural language queries with known-correct answers, giving every model change an objective benchmark.</li>
+                    <li>⚖️ <strong>LLM-as-Judge Scoring</strong> – Automated grading of AI-generated profile briefs and strategic highlights for accuracy, completeness, and tone, with human expert review calibrating the judges to catch drift.</li>
+                    <li>🔎 <strong>Groundedness & Hallucination Checks</strong> – Verified that every claim in AI output traced back to the Healthcare Map, publications, trials, or congress data — a hard requirement for a product whose users must defend KOL lists internally.</li>
+                    <li>🔁 <strong>Regression Evals in the Release Cycle</strong> – Ran the eval suite on every prompt, model, and retrieval change so quality regressions were caught before customers saw them, not after.</li>
+                </ul>
+
+                <h2>Failures & Lessons Learned</h2>
+                <ul class="styled-list">
+                    <li>⚖️ <strong>Balancing AI Transparency with Simplicity</strong> – Early iterations of the AI-generated profiles were too opaque, making it difficult for Medical Affairs leaders to defend KOL lists internally. We had to invest significantly in making the AI logic explainable without overwhelming users with complexity.</li>
+                    <li>🔗 <strong>Field Adoption Requires More Than Great Features</strong> – Building seamless CRM delivery was technically sound, but field teams needed more onboarding and change management support than anticipated. We learned that workflow transformation requires both the tool and the training.</li>
+                    <li>⏳ <strong>Scope Creep in Natural Language</strong> – The natural language customization feature attracted significant scope creep as stakeholders saw its potential. We had to ruthlessly prioritize the most impactful use cases for launch and defer advanced scenarios to subsequent releases.</li>
+                </ul>
+
+            </div>
+
+            <div class="right-section">
+                <h2>About the Product</h2>
+                <p>Aperture 2.0 is an AI-powered Medical Affairs platform that transforms how pharmaceutical teams identify, profile, and engage Key Opinion Leaders. It replaces static consulting-driven workflows with real-time, AI-driven intelligence across the full HCP engagement lifecycle.</p>
+
+                <h2>Business Outcomes</h2>
+                <div class="achievements">
+                    <div class="achievement">
+                        <h2>$500K+</h2>
+                        <p>Annual consulting costs eliminated per brand</p>
+                    </div>
+                    <div class="achievement">
+                        <h2>85%</h2>
+                        <p>Reduction in time-to-insight for KOL identification</p>
+                    </div>
+                </div>
+
+                <h2>Achievement Highlights</h2>
+                <div class="achievements">
+                    <div class="achievement">
+                        <h2>Minutes</h2>
+                        <p>Planning time collapsed from weeks to minutes with real-time AI discovery</p>
+                    </div>
+                    <div class="achievement">
+                        <h2>$0</h2>
+                        <p>Cost to customize scoring and tiering via natural language (vs. $150K+ consulting)</p>
+                    </div>
+                </div>
+
+                <div class="additional-features">
+                    <h2>Key Capabilities</h2>
+                    <ul class="styled-list">
+                        <li>🔍 <strong>Rising Star Identification</strong> – AI continuously monitors patient insights, clinical trials, and congress data to detect emerging KOLs before they appear on competitors' radar, providing a multi-month head start on scientific engagement.</li>
+                        <li>📋 <strong>Deep Contextual Profiles</strong> – Instantly generate comprehensive HCP and HCO profiles with rich engagement data including referral networks, industry payments, clinical trends, scientific impact, and network influence.</li>
+                        <li>🗺️ <strong>Analysis Canvas</strong> – Interactive geographic mapping with tiered segmentation (Established HCPs, Rising Stars, High Volume Practitioners) and exportable lists for CRM delivery.</li>
+                        <li>🔬 <strong>Discover Feed</strong> – Data-driven intelligence on congresses, clinical trials, and scientific publications with AI-curated recommendations tailored to each therapeutic area.</li>
+                    </ul>
+                </div>
+
+                <h2>Use Cases</h2>
+                <table class="styled-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Applications</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Field Strategy & Planning</td>
+                            <td>Rising star identification, KOL profiling and segmentation, comprehensive HCP profiles, engagement insights</td>
+                        </tr>
+                        <tr>
+                            <td>Evidence Generation</td>
+                            <td>Rapid treatment pattern analysis, patient journey mapping with deeper patient and HCO insights</td>
+                        </tr>
+                        <tr>
+                            <td>Scientific Exchange</td>
+                            <td>Automated pre-call planning with AI briefs, scientific narrative development, targeted engagement planning</td>
+                        </tr>
+                        <tr>
+                            <td>Compliance & Strategy</td>
+                            <td>Custom KOL scoring and segmentation, seamless CRM delivery</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h2>Screenshots</h2>
+                <div class="screenshots">
+                    <div class="screenshots-grid">
+                        <img src="/static/aperture1.png" alt="Aperture 2.0 Analysis Canvas with natural language chat and geographic KOL mapping" loading="lazy" decoding="async">
+                        <img src="/static/aperture2.png" alt="Aperture 2.0 HCP profile with AI Strategic Highlights and scientific impact metrics" loading="lazy" decoding="async">
+                        <img src="/static/aperture3.png" alt="Aperture 2.0 Discover feed with data-driven congress, trial, and publication intelligence" loading="lazy" decoding="async">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</body>
+</html>

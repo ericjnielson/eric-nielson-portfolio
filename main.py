@@ -260,6 +260,10 @@ def mba():
 def voc():
     return render_template('voc.html')
 
+@app.route('/aperture')
+def aperture():
+    return render_template('aperture.html')
+
 @app.route('/reinforcement_learning')
 def rl():
     return render_template('reinforcement_learning.html')

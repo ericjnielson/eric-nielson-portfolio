@@ -141,6 +141,10 @@ class PortfolioApp:
         def voc():
             return self.voc()
 
+        @self.app.route('/aperture')
+        def aperture():
+            return self.aperture()
+
         @self.app.route('/reinforcement_learning')
         def rl():
             return self.rl()
@@ -253,6 +257,9 @@ class PortfolioApp:
 
     def voc(self):
         return render_template('voc.html')
+
+    def aperture(self):
+        return render_template('aperture.html')
 
     def forecasting(self):
         return render_template('forecasting.html')
