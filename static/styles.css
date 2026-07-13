@@ -3856,3 +3856,44 @@ label, .form-group label { color: var(--ds-text); }
 .prediction-form, .input-form { background: transparent; }
 .forecast-container { background: var(--ds-surface); border: 1px solid var(--ds-border); }
 .field-toggle { background: var(--ds-surface-2); }
+
+/* ============================================================
+   Case-study redesign (cc-*): bold gradient hero with metric
+   chips + card-grid sections. Shared by all work example pages.
+   Uses the ds-* tokens above, so dark mode works automatically.
+   ============================================================ */
+.cc-hero { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #4f46e5 100%); color: #fff; padding: 72px 24px 64px; }
+.cc-hero-inner { max-width: 1050px; margin: 0 auto; }
+.cc-kicker { text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.78rem; font-weight: 700; color: #93c5fd; margin-bottom: 14px; }
+.cc-hero h1 { font-size: 2.8rem; line-height: 1.1; margin: 0 0 18px; color: #fff; }
+.cc-hero .lede { font-size: 1.15rem; line-height: 1.65; color: #cbd5e1; max-width: 44em; }
+.cc-hero .press { display: inline-block; margin-top: 14px; color: #93c5fd; font-weight: 600; text-decoration: none; border-bottom: 1px solid rgba(147, 197, 253, 0.4); }
+.cc-hero .press:hover { color: #fff; border-bottom-color: #fff; }
+.cc-hero .note { font-style: italic; color: #94a3b8; font-size: 0.88rem; margin-top: 12px; }
+.cc-chips { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 34px; }
+.cc-chip { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); backdrop-filter: blur(4px); border-radius: 14px; padding: 16px 22px; min-width: 170px; }
+.cc-chip .num { font-size: 1.7rem; font-weight: 800; color: #fff; }
+.cc-chip .cap { font-size: 0.82rem; color: #cbd5e1; margin-top: 4px; line-height: 1.35; }
+.cc-body { max-width: 1050px; margin: 0 auto; padding: 56px 24px 90px; }
+.cc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.cc-card { background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: 16px; padding: 28px; box-shadow: var(--ds-shadow-sm); color: var(--ds-text); }
+.cc-card.full { grid-column: 1 / -1; }
+.cc-card h2 { font-size: 1.3rem; margin: 0 0 14px; display: flex; align-items: center; gap: 10px; color: var(--ds-text); }
+.cc-card h2 .dot { width: 10px; height: 10px; border-radius: 3px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); flex: none; }
+.cc-card p { line-height: 1.7; }
+.cc-card .note { font-style: italic; color: var(--ds-text-muted); font-size: 0.9rem; }
+.cc-card ul.plain { list-style: none; margin: 0; padding: 0; }
+.cc-card ul.plain li { padding: 10px 0; border-bottom: 1px dashed var(--ds-border); line-height: 1.55; }
+.cc-card ul.plain li:last-child { border-bottom: none; }
+.cc-steps { counter-reset: step; list-style: none; margin: 0; padding: 0; }
+.cc-steps li { counter-increment: step; position: relative; padding: 0 0 18px 46px; line-height: 1.55; }
+.cc-steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #fff; font-weight: 700; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; }
+.cc-shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.cc-shots img { width: 100%; border-radius: 12px; border: 1px solid var(--ds-border); }
+.cc-table-wrap { overflow-x: auto; }
+@media (max-width: 860px) {
+  .cc-grid { grid-template-columns: 1fr; }
+  .cc-hero h1 { font-size: 2.1rem; }
+  .cc-hero { padding: 52px 20px 44px; }
+  .cc-chip { flex: 1 1 45%; min-width: 140px; }
+}
