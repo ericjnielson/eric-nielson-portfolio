@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Portfolio</title>
+        <link rel="stylesheet" href="/static/styles.css">
+        <script src="/static/theme.js"></script>
+        <style>
+            /* Option A: Editorial single-column with hero metrics band */
+            .cs-wrap { max-width: 900px; margin: 0 auto; padding: 0 24px 80px; }
+            .cs-hero { text-align: left; padding: 56px 0 8px; }
+            .cs-kicker { text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.8rem; font-weight: 700; color: #3b82f6; margin-bottom: 12px; }
+            .cs-hero h1 { font-size: 2.6rem; line-height: 1.15; margin: 0 0 16px; }
+            .cs-lede { font-size: 1.15rem; line-height: 1.6; color: var(--ds-text-muted, #555); max-width: 48em; }
+            .cs-note { font-style: italic; color: var(--ds-text-muted, #777); font-size: 0.9rem; margin-top: 10px; }
+            .cs-meta { display: flex; flex-wrap: wrap; gap: 32px; margin: 28px 0 0; padding: 20px 0; border-top: 1px solid var(--ds-border, #e5e7eb); border-bottom: 1px solid var(--ds-border, #e5e7eb); }
+            .cs-meta div span { display: block; }
+            .cs-meta .lbl { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ds-text-muted, #888); margin-bottom: 4px; }
+            .cs-meta .val { font-weight: 600; }
+            .cs-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 36px 0 8px; }
+            .cs-metric { background: var(--ds-surface, #f8fafc); border: 1px solid var(--ds-border, #e5e7eb); border-radius: 14px; padding: 22px 20px; }
+            .cs-metric .num { font-size: 2rem; font-weight: 800; color: #3b82f6; line-height: 1.1; }
+            .cs-metric .cap { font-size: 0.88rem; color: var(--ds-text-muted, #555); margin-top: 6px; line-height: 1.4; }
+            .cs-section { margin-top: 56px; }
+            .cs-section > h2 { font-size: 1.5rem; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 2px solid #3b82f6; display: inline-block; }
+            .cs-section p { line-height: 1.7; max-width: 52em; }
+            .cs-goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 8px; }
+            .cs-goal { background: var(--ds-surface, #f8fafc); border: 1px solid var(--ds-border, #e5e7eb); border-left: 4px solid #3b82f6; border-radius: 10px; padding: 18px; line-height: 1.55; }
+            .cs-timeline { list-style: none; margin: 8px 0 0; padding: 0; position: relative; }
+            .cs-timeline li { position: relative; padding: 0 0 26px 34px; line-height: 1.6; }
+            .cs-timeline li::before { content: ""; position: absolute; left: 9px; top: 8px; bottom: -8px; width: 2px; background: var(--ds-border, #dbeafe); }
+            .cs-timeline li:last-child::before { display: none; }
+            .cs-timeline li::after { content: ""; position: absolute; left: 4px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; }
+            .cs-shots { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+            .cs-shots img { width: 100%; border-radius: 12px; border: 1px solid var(--ds-border, #e5e7eb); }
+            .cs-shots img.wide { grid-column: 1 / -1; }
+            @media (max-width: 720px) { .cs-hero h1 { font-size: 2rem; } .cs-shots { grid-template-columns: 1fr; } }
+        </style>
+</head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-C7M0GTCBJX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-C7M0GTCBJX');
+</script>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">Home</a>
+            <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle dark mode" aria-pressed="false"><span class="theme-toggle__icon" aria-hidden="true">🌙</span></button>
+        </div>
+    </nav>
+
+    <div class="cs-wrap">
+        <header class="cs-hero">
+            <div class="cs-kicker">Work Example · Komodo Health</div>
+            <h1>Aperture 2.0: AI-Powered Medical Affairs</h1>
+            <p class="cs-lede">Aperture 2.0 (Marmot) transforms how pharma teams identify, engage, and act on Key Opinion Leader intelligence — replacing static, consultant-driven workflows with real-time AI discovery, natural language customization, and seamless CRM delivery.</p>
+            <p class="cs-note">Specific company data is masked below due to the open source nature of this project.</p>
+            <div class="cs-meta">
+                <div><span class="lbl">Role</span><span class="val">Senior Product Manager</span></div>
+                <div><span class="lbl">Company</span><span class="val">Komodo Health</span></div>
+                <div><span class="lbl">Focus</span><span class="val">AI / LLM Product Development</span></div>
+            </div>
+        </header>
+
+        <div class="cs-metrics">
+            <div class="cs-metric"><div class="num">$500K+</div><div class="cap">Annual consulting costs eliminated per brand</div></div>
+            <div class="cs-metric"><div class="num">85%</div><div class="cap">Reduction in time-to-insight for KOL identification</div></div>
+            <div class="cs-metric"><div class="num">Minutes</div><div class="cap">Planning time, collapsed from weeks</div></div>
+            <div class="cs-metric"><div class="num">$0</div><div class="cap">Cost to customize scoring vs. $150K+ consulting</div></div>
+        </div>
+
+        <section class="cs-section">
+            <h2>The Problem</h2>
+            <p>Medical Affairs teams at pharmaceutical companies face a critical strategy-to-execution gap. Home office leaders lack real-time patient data and the flexibility to customize KOL scoring for therapeutic area-specific needs, trapping them in rigid, slow-moving consulting cycles that cost $500K+ per year. Meanwhile, field teams miss real-time clinical signals needed to reach "rising stars" and relevant KOLs before the competition defines the narrative.</p>
+            <p>As the Senior Product Manager, I led the development of Aperture 2.0 to bridge this gap by replacing static, consultant-driven workflows with an AI-first platform that enables continuous discovery, natural language customization, and seamless CRM delivery.</p>
+        </section>
+
+        <section class="cs-section">
+            <h2>Goals</h2>
+            <div class="cs-goals">
+                <div class="cs-goal">🤖 <strong>AI-Driven KOL Discovery</strong> — Continuously monitor scientific shifts and pinpoint "rising stars" across global research, trials, and congresses.</div>
+                <div class="cs-goal">💬 <strong>Natural Language Customization</strong> — Let home office teams instantly customize KOL scoring and tiering in plain language.</div>
+                <div class="cs-goal">🌐 <strong>360° Field Intelligence</strong> — Surface clinical signals across claims, trials, congresses, and publications that siloed legacy sources miss.</div>
+                <div class="cs-goal">🚀 <strong>Seamless Field Execution</strong> — Push prioritized lists and governed insights directly into the MSL's daily CRM workflow.</div>
+            </div>
+        </section>
+
+        <section class="cs-section">
+            <h2>Challenges & Solutions</h2>
+            <table class="styled-table">
+                <thead><tr><th>Challenge</th><th>Solution</th></tr></thead>
+                <tbody>
+                    <tr><td>KOL lists couldn't be defended because the AI logic was a black box and the data was months old</td><td>Every insight is verifiable and grounded in the Healthcare Map with full transparency into the scoring methodology</td></tr>
+                    <tr><td>Custom scoring took 6 weeks and $150K+ per consulting project</td><td>Natural language customization lets users instantly tune scoring and tiering, eliminating the consulting dependency</td></tr>
+                    <tr><td>Fragmented data was not actionable; national strategies failed to convert into territory-specific tasks</td><td>Dynamic, prioritized lists push directly into CRM workflows so strategy reaches the field in an actionable format</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="cs-section">
+            <h2>The Product</h2>
+            <p>Aperture 2.0 replaces static consulting-driven workflows with real-time, AI-driven intelligence across the full HCP engagement lifecycle: rising star identification, deep contextual profiles with referral networks and scientific impact, an interactive Analysis Canvas with tiered segmentation, and a Discover feed of AI-curated congress, trial, and publication intelligence.</p>
+            <div class="cs-shots">
+                <img class="wide" src="/static/aperture1.png" alt="Analysis Canvas with natural language chat and geographic KOL mapping" loading="lazy" decoding="async">
+                <img src="/static/aperture2.png" alt="HCP profile with AI Strategic Highlights" loading="lazy" decoding="async">
+                <img src="/static/aperture3.png" alt="Discover feed with congress, trial, and publication intelligence" loading="lazy" decoding="async">
+            </div>
+        </section>
+
+        <section class="cs-section">
+            <h2>Development Timeline</h2>
+            <ul class="cs-timeline">
+                <li>Identified the strategy-to-execution gap through extensive Medical Affairs customer research and competitive analysis</li>
+                <li>Designed the AI-driven discovery engine to continuously monitor patient insights, clinical trials, and congress data</li>
+                <li>Built natural language customization to replace expensive consulting workflows for KOL scoring and tiering</li>
+                <li>Developed the Analysis Canvas with deep contextual HCP profiles, geographic mapping, and tiered segmentation</li>
+                <li>Launched CRM integration to push prioritized lists and network insights directly into field team workflows</li>
+            </ul>
+        </section>
+
+        <section class="cs-section">
+            <h2>AI Evaluations</h2>
+            <p>Because Aperture 2.0's core value depends on trustworthy AI output, I built a structured evaluation program to measure and improve quality before and after every release.</p>
+            <div class="cs-goals">
+                <div class="cs-goal">📋 <strong>Golden Datasets</strong> — Curated reference sets with Medical Affairs SMEs so every model change had an objective benchmark.</div>
+                <div class="cs-goal">⚖️ <strong>LLM-as-Judge Scoring</strong> — Automated grading of AI briefs for accuracy and tone, calibrated by human expert review.</div>
+                <div class="cs-goal">🔎 <strong>Groundedness Checks</strong> — Verified every claim traced back to the Healthcare Map, publications, trials, or congress data.</div>
+                <div class="cs-goal">🔁 <strong>Regression Evals</strong> — Ran the eval suite on every prompt, model, and retrieval change to catch regressions pre-release.</div>
+            </div>
+        </section>
+
+        <section class="cs-section">
+            <h2>Failures & Lessons Learned</h2>
+            <ul class="styled-list">
+                <li>⚖️ <strong>Balancing AI Transparency with Simplicity</strong> — Early AI-generated profiles were too opaque to defend internally. We invested heavily in making the logic explainable without overwhelming users.</li>
+                <li>🔗 <strong>Field Adoption Requires More Than Great Features</strong> — Seamless CRM delivery was technically sound, but field teams needed far more onboarding and change management than anticipated.</li>
+                <li>⏳ <strong>Scope Creep in Natural Language</strong> — The NL customization feature attracted heavy scope creep; we ruthlessly prioritized launch use cases and deferred advanced scenarios.</li>
+            </ul>
+        </section>
+    </div>
+</body>
+</html>
