@@ -81,6 +81,15 @@
                     </div>
                 </div>
 
+                <h2>AI Evaluations</h2>
+                <p>Because Aperture 2.0's core value depends on trustworthy AI output — KOL scoring, profile briefs, and natural language customization — I built a structured evaluation program to measure and improve quality before and after every release.</p>
+                <ul class="styled-list">
+                    <li>📋 <strong>Golden Datasets</strong> – Partnered with Medical Affairs subject matter experts to curate reference sets of KOL rankings, profile summaries, and natural language queries with known-correct answers, giving every model change an objective benchmark.</li>
+                    <li>⚖️ <strong>LLM-as-Judge Scoring</strong> – Automated grading of AI-generated profile briefs and strategic highlights for accuracy, completeness, and tone, with human expert review calibrating the judges to catch drift.</li>
+                    <li>🔎 <strong>Groundedness & Hallucination Checks</strong> – Verified that every claim in AI output traced back to the Healthcare Map, publications, trials, or congress data — a hard requirement for a product whose users must defend KOL lists internally.</li>
+                    <li>🔁 <strong>Regression Evals in the Release Cycle</strong> – Ran the eval suite on every prompt, model, and retrieval change so quality regressions were caught before customers saw them, not after.</li>
+                </ul>
+
                 <h2>Failures & Lessons Learned</h2>
                 <ul class="styled-list">
                     <li>⚖️ <strong>Balancing AI Transparency with Simplicity</strong> – Early iterations of the AI-generated profiles were too opaque, making it difficult for Medical Affairs leaders to defend KOL lists internally. We had to invest significantly in making the AI logic explainable without overwhelming users with complexity.</li>
