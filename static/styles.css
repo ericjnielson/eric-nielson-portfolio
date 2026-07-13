@@ -3897,3 +3897,15 @@ label, .form-group label { color: var(--ds-text); }
   .cc-hero { padding: 52px 20px 44px; }
   .cc-chip { flex: 1 1 45%; min-width: 140px; }
 }
+
+/* ============================================================
+   Consistent navbar across all pages: same look as the homepage
+   nav (logo + section links + theme toggle). The body.home rules
+   above still win on the homepage, where scroll-spy adds .active.
+   ============================================================ */
+.nav-links a {
+  color: var(--ds-text-muted); font-weight: 600; text-decoration: none;
+  position: relative; padding: 4px 2px; transition: color .2s ease;
+}
+.nav-links a:hover { color: var(--ds-text); text-decoration: none; }
+.nav-links ~ .theme-toggle { margin-left: 18px; }
